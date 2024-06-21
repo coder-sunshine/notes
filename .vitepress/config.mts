@@ -5,7 +5,7 @@ export default defineConfig({
   title: '秘密の花园',
   description: '学习足迹',
   outDir: 'docs', // 打包输出的目录
-  base: '/docs/', // 基础路径
+  base: '/notes/', // 基础路径
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
