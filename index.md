@@ -9,7 +9,7 @@ hero:
   actions:
     - theme: brand
       text: 前端工程化
-      link: /frontend/engineering/rollup/quickstart.md
+      link: /docs/frontend/engineering/rollup/quick-start.md
     - theme: alt
       text: API Examples
       link: /api-examples

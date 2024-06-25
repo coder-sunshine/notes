@@ -14,14 +14,14 @@ export default defineConfig({
 
     nav: [
       { text: '首页', link: '/' },
-      { text: '前端工程化', link: '/docs/frontend/engineering/rollup/quickstart.md' }
+      { text: '前端工程化', link: '/docs/frontend/engineering/rollup/quick-start.md' }
     ],
 
     sidebar: [
       {
         text: 'Rollup',
         items: [
-          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quickstart.md' },
+          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start.md' },
           { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config.md' }
         ]
       }
