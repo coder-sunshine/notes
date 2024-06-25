@@ -4,21 +4,25 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: '秘密の花园',
   description: '学习足迹',
-  outDir: 'docs', // 打包输出的目录
-  base: '/notes/', // 基础路径
+  base: '/notes/', // 基础路径，必须以 / 开头结尾
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
+
+    outline: {
+      label: '文章目录'
+    },
+
     nav: [
       { text: '首页', link: '/' },
-      { text: '前端工程化', link: '/frontend/engineering/rollup/quickstart.md' }
+      { text: '前端工程化', link: '/docs/frontend/engineering/rollup/quickstart.md' }
     ],
 
     sidebar: [
       {
         text: 'Rollup',
         items: [
-          { text: '快速开始', link: '/frontend/engineering/rollup/quickstart.md' },
-          { text: '常用配置', link: '/frontend/engineering/rollup/common-config.md' }
+          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quickstart.md' },
+          { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config.md' }
         ]
       }
     ],
