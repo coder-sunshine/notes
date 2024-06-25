@@ -13,6 +13,8 @@ export default defineConfig({
       label: '文章目录'
     },
 
+    logo: "logo.svg", // 配置logo位置，public目录
+
     nav: [
       { text: '首页', link: '/' },
       { text: '前端工程化', link: '/docs/frontend/engineering/rollup/quick-start.md' }
