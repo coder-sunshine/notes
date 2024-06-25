@@ -4,7 +4,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: '秘密の花园',
   description: '学习足迹',
-  head: [['link', { rel: 'icon', href: '/logo.svg' }]],
+  head: [['link', { rel: 'icon', href: '/notes/logo.svg' }]],
   base: '/notes/', // 基础路径，必须以 / 开头结尾
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
