@@ -3,9 +3,12 @@
 layout: home
 
 hero:
-  name: "notes..."
-  text: "sunshine的秘密の花园"
+  name: 'notes...'
+  text: 'sunshine的秘密の花园'
   tagline: 好记性不如烂笔头
+  image:
+    src: /background.svg
+    alt: 背景图
   actions:
     - theme: brand
       text: 前端工程化
@@ -22,4 +25,3 @@ features:
   - title: 🤔 思考
     details: 学会思考，不要人云亦云
 ---
-
