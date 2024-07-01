@@ -10,14 +10,15 @@ export default defineConfig({
     // https://vitepress.dev/reference/default-theme-config
 
     outline: {
-      label: '文章目录'
+      label: '文章目录',
+      level: [2, 6]
     },
 
-    logo: "logo.svg", // 配置logo位置，public目录
+    logo: 'logo.svg', // 配置logo位置，public目录
 
     nav: [
       { text: '首页', link: '/' },
-      { text: '前端工程化', link: '/docs/frontend/engineering/rollup/quick-start.md' }
+      { text: '前端', items: [{ text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start.md' }] }
     ],
 
     sidebar: [
@@ -26,6 +27,12 @@ export default defineConfig({
         items: [
           { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start.md' },
           { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config.md' }
+        ]
+      },
+      {
+        text: 'Postcss',
+        items: [
+          { text: '简介与配置', link: '/docs/frontend/engineering/postcss/postcss.md' },
         ]
       }
     ],

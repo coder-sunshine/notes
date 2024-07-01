@@ -11,11 +11,8 @@ hero:
     alt: 背景图
   actions:
     - theme: brand
-      text: 前端工程化
+      text: 前端
       link: /docs/frontend/engineering/rollup/quick-start.md
-    - theme: alt
-      text: API Examples
-      link: /api-examples
 
 features:
   - title: 💡 小建议
