@@ -21,6 +21,7 @@ concurrency:
 jobs:
   # 构建工作
   build:
+    # 运行在 最新版本的 Ubuntu 系统上
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
