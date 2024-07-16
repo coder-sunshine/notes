@@ -153,6 +153,21 @@ const plugins: AcceptedPlugin[] = [
 
 **接下来用另外一种配置方式，就是工程中常用的配置方式**
 
+```bash
+pnpm add postcss-cli -D
+```
+
+安装完成后，我们就可以通过 postcss-cli 所提供的命令来进行文件的编译操作，在 package.json 里面添加如下的脚本：
+
+```json
+"scripts": {
+  	...
+    "build": "postcss ./3-工程化配置/index.css -o ./3-工程化配置/build.css"
+},
+```
+
+![20240716165855](https://tuchuang.coder-sunshine.top/images/20240716165855.png)
+
 ```javascript
 /** @type {import('postcss-load-config').Config} */
 const config = {
@@ -175,7 +190,27 @@ const config = {
 module.exports = config
 ```
 
-![20240712134123](https://tuchuang.coder-sunshine.top/images/20240712134123.png)
+index.css
+
+```css
+/* 这是一个注释 */
+.flex {
+    display: flex;
+    /* font-size: 20px; */
+}
+
+h1,h2,h3,h4,h5,h6 {
+    margin-top: 20px;
+}
+```
+
+执行 build 命令 编译后就是下面这样
+
+![20240716170217](https://tuchuang.coder-sunshine.top/images/20240716170217.png)
+
+开启压缩 cssnano
+
+![20240716170323](https://tuchuang.coder-sunshine.top/images/20240716170323.png)
 
 为了看得清楚，暂时注释压缩，压缩通常放在最后一个执行
 
@@ -183,14 +218,20 @@ module.exports = config
 
 该插件主要用于处理 CSS 文件中 @import 规则。在原生的 CSS 中，存在 @import，可以引入其他的 CSS 文件，但是在引入的时候会存在一个问题，就是客户端在解析 CSS 文件时，发现有 @import 就会发送 HTTP 请求去获取对应的 CSS 文件。
 
+```bash
+pnpm add postcss-import -D
+```
+
+index1.css
+
 ```css
-body {
-  margin: 200px !important;
+test1 {
+  color: red;
 }
 ```
 
 ```css
-@import './index2.css';
+@import './index1.css';
 
 @custom-selector :--heading h1, h2, h3, h4, h5, h6;
 
@@ -209,11 +250,11 @@ body {
 }
 ```
 
-![20240712134154](https://tuchuang.coder-sunshine.top/images/20240712134154.png)
+![20240716171920](https://tuchuang.coder-sunshine.top/images/20240716171920.png)
 
 打开配置，重新打包
 
-![20240712134223](https://tuchuang.coder-sunshine.top/images/20240712134223.png)
+![20240716172040](https://tuchuang.coder-sunshine.top/images/20240716172040.png)
 
 #### purgecss
 
@@ -233,7 +274,7 @@ pnpm add @fullhuman/postcss-purgecss -D
     <link rel="stylesheet" href="../dist/build.css" />
   </head>
   <body>
-    <div class="test">123</div>
+    <div class="test1">123</div>
   </body>
 </html>
 ```
@@ -244,7 +285,7 @@ const config = {
   plugins: [
     require('postcss-import'),
     require('@fullhuman/postcss-purgecss')({
-      content: ['./src/**/*.html'] // 以html为参照
+      content: ['./**/*.html'] // 以html为参照
     }),
     require('autoprefixer'),
     require('postcss-preset-env')({
@@ -264,17 +305,17 @@ const config = {
 module.exports = config
 ```
 
-打包之前的 css，可以发现只有 body 样式了
+打包之前的 css，可以发现只有 test1 样式了
 
-![20240712134251](https://tuchuang.coder-sunshine.top/images/20240712134251.png)
+![20240716172511](https://tuchuang.coder-sunshine.top/images/20240716172511.png)
 
 还有一个配置也很重要。
 
-![20240712134312](https://tuchuang.coder-sunshine.top/images/20240712134312.png)
+![20240716172757](https://tuchuang.coder-sunshine.top/images/20240716172757.png)
 
 表示以 active- 开头的类名都不需要树摇，还可以写入一些 hover 啥的等
 
-![20240712134338](https://tuchuang.coder-sunshine.top/images/20240712134338.png)
+![20240716172834](https://tuchuang.coder-sunshine.top/images/20240716172834.png)
 
 ### 自定义插件
 

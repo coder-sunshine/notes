@@ -1,0 +1,22 @@
+{
+  "name": "postcss",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "postcss ./3-工程化配置/index.css -o ./3-工程化配置/build.css"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@fullhuman/postcss-purgecss": "^6.0.0",
+    "@types/node": "^20.14.10",
+    "autoprefixer": "^10.4.19",
+    "cssnano": "^7.0.4",
+    "postcss": "^8.4.39",
+    "postcss-cli": "^11.0.0",
+    "postcss-import": "^16.1.0",
+    "postcss-preset-env": "^9.6.0"
+  }
+}
