@@ -1,10 +1,18 @@
 {
   "devDependencies": {
+    "@commitlint/config-conventional": "^19.2.2",
+    "czg": "^1.9.3",
     "vitepress": "^1.2.3"
   },
   "scripts": {
     "docs:dev": "vitepress dev",
     "docs:build": "vitepress build",
-    "docs:preview": "vitepress preview"
+    "docs:preview": "vitepress preview",
+    "commit": "czg"
+  },
+  "config": {
+    "commitizen": {
+      "path": "node_modules/cz-git"
+    }
   }
 }
