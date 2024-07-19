@@ -18,15 +18,15 @@ export default defineConfig({
 
     nav: [
       { text: '首页', link: '/' },
-      { text: '前端', items: [{ text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start.md' }] }
+      { text: '前端', items: [{ text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start/quick-start.md' }] }
     ],
 
     sidebar: [
       {
         text: 'Rollup',
         items: [
-          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start.md' },
-          { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config.md' }
+          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start/quick-start.md' },
+          { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config/common-config.md' }
         ]
       },
       {

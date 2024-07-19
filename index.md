@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: 前端
-      link: /docs/frontend/engineering/rollup/quick-start.md
+      link: /docs/frontend/engineering/rollup/quick-start/quick-start.md
 
 features:
   - title: 💡 小建议
