@@ -18,24 +18,43 @@ export default defineConfig({
 
     nav: [
       { text: '首页', link: '/' },
-      { text: '前端', items: [{ text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start/quick-start.md' }] }
-    ],
-
-    sidebar: [
       {
-        text: 'Rollup',
+        text: '前端',
         items: [
-          { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start/quick-start.md' },
-          { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config/common-config.md' }
+          {
+            text: 'React',
+            link: '/docs/frontend/react/hook-test/index.md',
+          },
+          { text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start/index.md' }
         ]
       },
-      {
-        text: 'Postcss',
-        items: [
-          { text: '简介与配置', link: '/docs/frontend/engineering/postcss/postcss.md' },
-        ]
-      }
     ],
+
+    sidebar: {
+      '/docs/frontend/react': [
+        {
+          text: '常用Hooks',
+          link: '/docs/frontend/react/hook-test/index.md'
+        },
+        {
+          text: 'Hook 的闭包陷阱的成因和解决方案',
+          link: '/docs/frontend/react/closure-trap/index.md'
+        },
+      ],
+      '/docs/frontend/engineering': [
+        {
+          text: 'Rollup',
+          items: [
+            { text: '快速开始', link: '/docs/frontend/engineering/rollup/quick-start/index.md' },
+            { text: '常用配置', link: '/docs/frontend/engineering/rollup/common-config/index.md' }
+          ]
+        },
+        {
+          text: 'Postcss',
+          items: [{ text: '简介与配置', link: '/docs/frontend/engineering/postcss/index.md' }]
+        }
+      ]
+    },
 
     // 页脚
     docFooter: {

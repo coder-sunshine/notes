@@ -11,8 +11,11 @@ hero:
     alt: 背景图
   actions:
     - theme: brand
-      text: 前端
-      link: /docs/frontend/engineering/rollup/quick-start/quick-start.md
+      text: React
+      link: /docs/frontend/react/hook-test
+    - theme: brand
+      text: 前端工程化
+      link: /docs/frontend/engineering/rollup/quick-start
 
 features:
   - title: 💡 小建议
