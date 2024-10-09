@@ -170,3 +170,73 @@ useEffect 的 effect 函数会在操作 dom 之后异步执行
 也就是说，绝大多数情况下，用 useEffect，它能避免因为 effect 逻辑执行时间长导致页面卡顿（掉帧）。 但如果你遇到闪动的问题比较严重，那可以用 useLayoutEffect，但要注意 effect 逻辑不要执行时间太长。
 
 同步、异步执行 effect 都各有各的问题和好处，所以 React 暴露了 useEffect 和 useLayoutEffect 这两个 hook 出来，让开发者自己决定。
+
+## useReducer
+
+前面用的 setState 都是直接修改值，那如果在修改值之前需要执行一些固定的逻辑呢？
+
+这时候就要用 useReducer 了：
+
+```tsx
+import { Reducer, useReducer } from 'react'
+
+interface Data {
+  result: number
+}
+
+interface Action {
+  type: 'add' | 'minus'
+  num: number
+}
+function reducer(state: Data, action: Action) {
+  switch (action.type) {
+    case 'add':
+      return {
+        result: state.result + action.num
+      }
+    case 'minus':
+      return {
+        result: state.result - action.num
+      }
+  }
+  return state
+}
+
+function App() {
+  // useReducer 的类型参数传入 Reducer<数据的类型，action 的类型>
+  // 第一个参数是 reducer，第二个参数是初始数据。
+  const [res, dispatch] = useReducer<Reducer<Data, Action>>(reducer, { result: 0 })
+
+  return (
+    <div>
+      <div onClick={() => dispatch({ type: 'add', num: 2 })}>加</div>
+      <div onClick={() => dispatch({ type: 'minus', num: 1 })}>减</div>
+      <div>{res.result}</div>
+    </div>
+  )
+}
+
+export default App
+```
+
+然后点击加减分别触发对应的 action，reducer 根据 action 的 type 进行操作，修改 state，然后重新渲染。
+
+其实这个例子不复杂，没必要用 useReducer。但是如果要执行比较复杂的逻辑呢？
+
+用 useState 需要在每个地方都写一遍这个逻辑，而用 useReducer 则是把它封装到 reducer 里，通过 action 触发就好了。
+
+**当修改 state 的逻辑比较复杂，用 useReducer。**
+
+回过头来继续看 useReducer：
+
+```tsx
+const [res, dispatch] = useReducer<Reducer<Data, Action>, string>(reducer, 'zero', param => {
+  return {
+    result: param === 'zero' ? 0 : 1
+  }
+})
+```
+
+它还有另一种重载，通过函数来创建初始数据，这时候 useReducer 第二个参数就是传给这个函数的参数。
+
+并且在类型参数里也需要传入它的类型。
