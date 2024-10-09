@@ -229,6 +229,10 @@ export default App
 
 回过头来继续看 useReducer：
 
+它还有另一种重载，通过函数来创建初始数据，这时候 useReducer 第二个参数就是传给这个函数的参数。
+
+并且在类型参数里也需要传入它的类型。
+
 ```tsx
 const [res, dispatch] = useReducer<Reducer<Data, Action>, string>(reducer, 'zero', param => {
   return {
@@ -237,6 +241,158 @@ const [res, dispatch] = useReducer<Reducer<Data, Action>, string>(reducer, 'zero
 })
 ```
 
-它还有另一种重载，通过函数来创建初始数据，这时候 useReducer 第二个参数就是传给这个函数的参数。
+## useReducer + immer
 
-并且在类型参数里也需要传入它的类型。
+使用 reducer 有一个特别要注意的地方：
+
+![20241009150004](https://tuchuang.coder-sunshine.top/images/20241009150004.png)
+
+如果直接修改原始的 state 返回，是触发不了重新渲染的：加 不管点多少次都没用
+
+![20241009151206](https://tuchuang.coder-sunshine.top/images/20241009151206.png)
+
+必须返回一个新的对象才行。
+
+但这也有个问题，如果对象结构很复杂，每次都创建一个新的对象会比较繁琐，而且性能也不好。
+
+比如这样：
+
+```tsx
+import { Reducer, useReducer } from 'react'
+
+interface Data {
+  a: {
+    c: {
+      e: number
+      f: number
+    }
+    d: number
+  }
+  b: number
+}
+
+interface Action {
+  type: 'add'
+  num: number
+}
+
+function reducer(state: Data, action: Action) {
+  switch (action.type) {
+    case 'add':
+      return {
+        ...state,
+        a: {
+          ...state.a,
+          c: {
+            ...state.a.c,
+            e: state.a.c.e + action.num
+          }
+        }
+      }
+  }
+  return state
+}
+
+function App() {
+  const [res, dispatch] = useReducer<Reducer<Data, Action>, string>(reducer, 'zero', param => {
+    return {
+      a: {
+        c: {
+          e: 0,
+          f: 0
+        },
+        d: 0
+      },
+      b: 0
+    }
+  })
+
+  return (
+    <div>
+      <div onClick={() => dispatch({ type: 'add', num: 2 })}>加</div>
+      <div>{JSON.stringify(res)}</div>
+    </div>
+  )
+}
+
+export default App
+```
+
+![20241009151415](https://tuchuang.coder-sunshine.top/images/20241009151415.png)
+
+点两次加
+
+![20241009151430](https://tuchuang.coder-sunshine.top/images/20241009151430.png)
+
+这里的 data 是一个复杂的对象结构，需要改的是其中的一个属性，但是为了创建新对象，要把其余属性依次复制一遍。
+
+这样能完成功能，但是写起来很麻烦，也不好维护。
+
+有没有什么更好的方式呢？
+
+有，复杂对象的修改就要用 immutable 相关的库了。
+
+最常用的是 immer：
+
+```shell
+pnpm i immer
+```
+
+用法相当简单，只有一个 produce 的 api：
+
+第一个参数是要修改的对象，第二个参数的函数里直接修改这个对象的属性，返回的结果就是一个新的对象。
+
+![20241009151706](https://tuchuang.coder-sunshine.top/images/20241009151706.png)
+
+功能正常。用起来超级简单。
+
+immer 是依赖 Proxy 实现的，它会监听你在函数里对属性的修改，然后帮你创建一个新对象。
+
+reducer 需要返回一个新的对象，才会触发渲染，其实 useState 也是。
+
+比如这样：
+
+```tsx
+import { useState } from 'react'
+
+function App() {
+  const [obj, setObj] = useState({
+    a: {
+      c: {
+        e: 0,
+        f: 0
+      },
+      d: 0
+    },
+    b: 0
+  })
+
+  return (
+    <div>
+      <div
+        onClick={() => {
+          obj.a.c.e++
+          setObj(obj)
+        }}
+      >
+        加
+      </div>
+      <div>{JSON.stringify(obj)}</div>
+    </div>
+  )
+}
+
+export default App
+```
+
+因为对象引用没变，同样不会重新渲染：
+
+也可以用 immer 处理：
+
+![20241009152122](https://tuchuang.coder-sunshine.top/images/20241009152122.png)
+
+综上，**在 react 里，只要涉及到 state 的修改，就必须返回新的对象，不管是 useState 还是 useReducer。**
+
+如果是复杂的深层对象的修改，可以用 immer 来优化。
+
+这也就是大家常说 React 推崇的是数据不可变原理
