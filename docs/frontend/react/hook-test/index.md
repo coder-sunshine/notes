@@ -396,3 +396,65 @@ export default App
 如果是复杂的深层对象的修改，可以用 immer 来优化。
 
 这也就是大家常说 React 推崇的是数据不可变原理
+
+## useRef
+
+useRef 通常用来保存 DOM 引用
+
+```tsx
+import { useEffect, useRef } from 'react'
+
+function App() {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  })
+
+  return (
+    <div>
+      <input ref={inputRef}></input>
+    </div>
+  )
+}
+
+export default App
+```
+
+ref 其实就是一个有 current 属性的对象，除了可以保存 dom 引用，也可以放别的内容：
+
+```tsx
+function App() {
+  const numRef = useRef<number>(0)
+
+  return (
+    <div>
+      <div
+        onClick={() => {
+          numRef.current += 1
+        }}
+      >
+        {numRef.current}
+      </div>
+    </div>
+  )
+}
+
+export default App
+```
+
+![20241009153358](https://tuchuang.coder-sunshine.top/images/20241009153358.png)
+
+此时不管怎么点击都没反应，因为它不会触发重新渲染
+
+想触发渲染，还是得配合 state：
+
+![20241009154254](https://tuchuang.coder-sunshine.top/images/20241009154254.png)
+
+不过一般不这么用，如果想改变内容会触发重新渲染，直接用 useState 或者 useReducer 就可以了。
+
+useRef 一般是用来存一些不是用于渲染的内容的。
+
+单个组件内如何拿到 ref 我们知道了，那如果是想把 ref 从子组件传递到父组件呢？
+
+这种有专门的 api： forwardRef。
