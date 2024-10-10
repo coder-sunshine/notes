@@ -458,3 +458,108 @@ useRef 一般是用来存一些不是用于渲染的内容的。
 单个组件内如何拿到 ref 我们知道了，那如果是想把 ref 从子组件传递到父组件呢？
 
 这种有专门的 api： forwardRef。
+
+## forwardRef + useImperativeHandle
+
+```tsx
+import { useRef } from 'react'
+import { useEffect } from 'react'
+import React from 'react'
+
+const Child: React.ForwardRefRenderFunction<HTMLInputElement> = (props, ref) => {
+  return (
+    <div>
+      <input ref={ref}></input>
+    </div>
+  )
+}
+
+const WrapedChild = React.forwardRef(Child)
+
+function App() {
+  const ref = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    console.log('ref', ref.current)
+    ref.current?.focus()
+  }, [])
+
+  return (
+    <div className='App'>
+      <WrapedChild ref={ref} />
+    </div>
+  )
+}
+
+export default App
+```
+
+使用 forwardRef 可以把 ref 传递到父组件，然后父组件就可以通过 ref.current 得到子组件传过来的 ref。
+
+被 forwardRef 包裹的组件的类型就要用 React.forwardRefRenderFunction 了
+
+![20241010091543](https://tuchuang.coder-sunshine.top/images/20241010091543.png)
+
+第一个类型参数是 ref 的 content 的类型，第二个类型参数是 props 的类型。
+
+但有的时候，我不是想把原生标签暴露出去，而是暴露一些自定义内容。
+
+这时候就需要 useImperativeHandle 的 hook 了。
+
+它有 3 个参数，第一个是传入的 ref，第二个是是返回新的 ref 值的函数，第三个是依赖数组。
+
+```tsx
+import React, { useRef, useEffect, useImperativeHandle } from 'react'
+
+interface RefProps {
+  aaa: () => void
+}
+
+const Child: React.ForwardRefRenderFunction<RefProps> = (props, ref) => {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // 有 3 个参数，第一个是传入的 ref，第二个是是返回新的 ref 值的函数，第三个是依赖数组
+  useImperativeHandle(
+    ref,
+    () => {
+      return {
+        aaa() {
+          inputRef.current?.focus()
+        }
+      }
+    },
+    [inputRef]
+  )
+
+  return (
+    <div>
+      <input ref={inputRef}></input>
+    </div>
+  )
+}
+
+const WrapedChild = React.forwardRef(Child)
+
+function App() {
+  const ref = useRef<RefProps>(null)
+
+  useEffect(() => {
+    console.log('ref', ref.current)
+    ref.current?.aaa()
+  }, [])
+
+  return (
+    <div className='App'>
+      <WrapedChild ref={ref} />
+    </div>
+  )
+}
+
+export default App
+```
+
+其实就是用 useImperativeHandle 自定义了 ref 对象，然后父组件里拿到的 ref 就是 useImperativeHandle 第二个参数的返回值了。
+
+![20241010092115](https://tuchuang.coder-sunshine.top/images/20241010092115.png)
+
+效果一样
