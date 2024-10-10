@@ -563,3 +563,74 @@ export default App
 ![20241010092115](https://tuchuang.coder-sunshine.top/images/20241010092115.png)
 
 效果一样
+
+## useContext
+
+跨任意层组件传递数据，一般用 Context。
+
+```tsx
+import { createContext, useContext } from 'react'
+
+const countContext = createContext(111)
+
+function Aaa() {
+  return (
+    <div>
+      <countContext.Provider value={222}>
+        <Bbb></Bbb>
+      </countContext.Provider>
+    </div>
+  )
+}
+
+function Bbb() {
+  return (
+    <div>
+      <Ccc></Ccc>
+    </div>
+  )
+}
+
+function Ccc() {
+  const count = useContext(countContext)
+  return <h2>context 的值为：{count}</h2>
+}
+
+export default Aaa
+```
+
+用 createContext 创建 context，在 Aaa 里面使用 xxxContext.Provider 修改它的值，然后在 Ccc 里面用 useContext 取出来。
+
+可以看到，拿到的值是被 Provider 修改过的 222。
+
+class 组件是通过 Consumer 来取 context 的值：
+
+```tsx
+import { createContext, Component } from 'react'
+
+const countContext = createContext(111)
+
+class Ccc extends Component {
+  render() {
+    return <h2>context 的 值为：{this.props.count}</h2>
+  }
+}
+
+function Bbb() {
+  return (
+    <div>
+      <countContext.Consumer>{count => <Ccc count={count}></Ccc>}</countContext.Consumer>
+    </div>
+  )
+}
+```
+
+不过现在很少写 class 组件了。
+
+总结一下就是，**用 createContext 创建 context 对象，用 Provider 修改其中的值， function 组件使用 useContext 的 hook 来取值，class 组件使用 Consumer 来取值。**
+
+组件库里用 Context 很多，比如 antd 里就有大量 Context 的使用：
+
+![20241010094518](https://tuchuang.coder-sunshine.top/images/20241010094518.png)
+
+配置数据基本都是用 Context 传递。
