@@ -4,12 +4,16 @@ function App() {
   const [count, setCount] = useState(0)
 
   useEffect(() => {
-    setInterval(() => {
-      console.log(count)
-      // setCount(count + 1)
-      setCount(count => count + 1)
+    console.log(count)
+
+    const timer = setInterval(() => {
+      setCount(count + 1)
     }, 1000)
-  }, [])
+
+    return () => {
+      clearInterval(timer)
+    }
+  }, [count])
 
   return <div>{count}</div>
 }
