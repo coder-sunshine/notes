@@ -1,14 +1,17 @@
-import ansiEscapes from 'ansi-escapes';
-import { EOL } from 'os';
+import ansiEscapes from 'ansi-escapes'; // 用于控制台光标的隐藏、显示和位置保存/恢复。
+import chalk from 'chalk';
+import { EOL } from 'os'; // 表示操作系统的行尾符号。
+// 用于输出到控制台。
 const write = process.stdout.write.bind(process.stdout);
 export class ProgressBar {
     constructor() {
-        this.total = 0;
-        this.value = 0;
+        this.total = 0; // 进度条的总值。
+        this.value = 0; // 进度条当前的进度值。
     }
     start(total, initValue) {
         this.total = total;
         this.value = initValue;
+        // 隐藏光标并保存光标位置。
         write(ansiEscapes.cursorHide);
         write(ansiEscapes.cursorSavePosition);
         this.render();
@@ -26,7 +29,7 @@ export class ProgressBar {
         const completeSize = Math.floor(progress * barSize);
         const incompleteSize = barSize - completeSize;
         write(ansiEscapes.cursorRestorePosition);
-        write('█'.repeat(completeSize));
+        write(chalk.red('█').repeat(completeSize));
         write('░'.repeat(incompleteSize));
         write(` ${this.value} / ${this.total}`);
     }
@@ -38,6 +41,7 @@ export class ProgressBar {
         return this.total;
     }
     stop() {
+        // 显示光标并换行。
         write(ansiEscapes.cursorShow);
         write(EOL);
     }
