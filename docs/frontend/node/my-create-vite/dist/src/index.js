@@ -205,8 +205,10 @@ function init() {
                 // 创建目标目录，recursive: true 表示如果父目录不存在会递归创建
                 fs.mkdirSync(destDir, { recursive: true });
                 for (const file of fs.readdirSync(srcDir)) {
-                    const srcFile = path.resolve(srcDir, file);
-                    const destFile = path.resolve(destDir, file);
+                    // 拼接源文件和目标文件的完整路径
+                    const srcFile = path.resolve(srcDir, file); // 源文件完整路径
+                    const destFile = path.resolve(destDir, file); // 目标文件完整路径
+                    // 递归复制文件或目录
                     copy(srcFile, destFile);
                 }
             }
@@ -231,6 +233,7 @@ function init() {
                 write(file);
             }
             // 计算相对路径并输出完成信息
+            // path.relative 是拿到从 a 目录到 b 目录的相对路径。
             const cdProjectName = path.relative(process.cwd(), root);
             console.log(`\nDone. Now run:\n`);
             if (root !== process.cwd()) {
