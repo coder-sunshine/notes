@@ -71,6 +71,10 @@ export default defineConfig({
           text: '环境搭建',
           link: '/docs/frontend/vue3-core/docs/environment-setup.md',
         },
+        {
+          text: '响应式原理',
+          link: '/docs/frontend/vue3-core/docs/reactivity.md',
+        },
       ],
     },
 

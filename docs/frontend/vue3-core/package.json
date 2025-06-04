@@ -15,5 +15,8 @@
     "@types/node": "^22.15.29",
     "esbuild": "^0.25.5",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "vue": "^3.5.16"
   }
 }
