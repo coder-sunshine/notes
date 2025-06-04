@@ -2,6 +2,7 @@
   "devDependencies": {
     "@commitlint/config-conventional": "^19.2.2",
     "czg": "^1.9.3",
+    "prettier": "^3.5.3",
     "vitepress": "^1.2.3"
   },
   "scripts": {
