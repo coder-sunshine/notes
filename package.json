@@ -15,5 +15,8 @@
     "commitizen": {
       "path": "node_modules/cz-git"
     }
+  },
+  "dependencies": {
+    "@catppuccin/vitepress": "^0.1.2"
   }
 }

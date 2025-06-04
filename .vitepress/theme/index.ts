@@ -2,6 +2,7 @@
 import { h } from 'vue'
 import type { Theme } from 'vitepress'
 import DefaultTheme from 'vitepress/theme'
+import '@catppuccin/vitepress/theme/frappe/mauve.css'
 import './style.css'
 
 export default {
