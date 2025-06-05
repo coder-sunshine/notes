@@ -94,3 +94,11 @@ export function effect(fn) {
 ```
 
 ![20250604173144](https://tuchuang.coder-sunshine.top/images/20250604173144.png)
+
+### 链表链接dep和sub
+
+使用链表节点将dep和sub串起来，当dep发生变化时，通过dep关联的链表节点link找到对应的sub,通知sub重新执行。
+
+#### 收集依赖
+
+在 effect 里面读取了响应式数据的时候，需要收集当前 activeSub 和 dep 对应关系

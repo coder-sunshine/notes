@@ -13,7 +13,13 @@
       const count = ref(0)
 
       effect(() => {
+        console.dir(count)
         console.log('effect执行了', count.value)
+      })
+
+      effect(() => {
+        console.dir(count)
+        console.log('effect执行了2', count.value)
       })
 
       setTimeout(() => {
