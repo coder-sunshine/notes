@@ -77,5 +77,5 @@ export function propagate(subs: Link) {
   }
 
   // 拿到所有的sub执行
-  queuedEffect.forEach(effect => effect.run())
+  queuedEffect.forEach(effect => effect.notify())
 }

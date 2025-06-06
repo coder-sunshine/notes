@@ -352,8 +352,7 @@ export function effect(fn) {
 }
 ```
 
-> [!TIP]
-> 当 `effect1` 执行的时候，`activeSub = effect1`，然后在 `effect1` 里面又创建了 `effect2`，此时执行 `effect2` 的 `run` 方法，这时 `activeSub` 就变成了 `effect2`，等 `effect2` 执行完后，`activeSub = undefined`，但是此时的 `effect1` 还没执行完，继续访问 `effect1` 的 ref，因为 `activeSub` 是 `undefined`，所以也不会继续收集依赖了，所以这里不能单纯的设置为 `undefined`，可以在 `activeSub = this` 之前，也就是在 fn 执行之前，先把 之前的 `effect` 保存起来，执行完毕之后，再把之前的赋值给 `activeSub`。
+> [!TIP] 当 `effect1` 执行的时候，`activeSub = effect1`，然后在 `effect1` 里面又创建了 `effect2`，此时执行 `effect2` 的 `run` 方法，这时 `activeSub` 就变成了 `effect2`，等 `effect2` 执行完后，`activeSub = undefined`，但是此时的 `effect1` 还没执行完，继续访问 `effect1` 的 ref，因为 `activeSub` 是 `undefined`，所以也不会继续收集依赖了，所以这里不能单纯的设置为 `undefined`，可以在 `activeSub = this` 之前，也就是在 fn 执行之前，先把 之前的 `effect` 保存起来，执行完毕之后，再把之前的赋值给 `activeSub`。
 
 ```ts
 // 用来保存当前正在执行的 effect
@@ -387,3 +386,117 @@ export function effect(fn) {
 ![20250606102151](https://tuchuang.coder-sunshine.top/images/20250606102151.png)
 
 这样打印就正常了
+
+### 调度器
+
+调度器是响应式系统中一个重要的概念，我们默认使用 `effect` 访问响应式属性的时候，会收集依赖，当然我们修改响应式属性后，这个 `effect` 的 `fn` 会重新执行，而 `scheduler` 的作用是，当响应式数据发生变化的时候，执行 `scheduler`，而不是重新执行 `fn`，当然我们在创建 `effect` 的时候，还是会执行 `fn`，因为要靠它收集依赖，
+
+```js
+import { ref, effect } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+// import { ref, effect } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const runner = effect(
+  () => {
+    console.log('effect执行了', count.value)
+    return 123
+  },
+  {
+    scheduler: () => {
+      const newValue = runner()
+      console.log('调度器执行了', newValue)
+    },
+  }
+)
+
+setTimeout(() => {
+  count.value++
+}, 1000)
+```
+
+![20250606142046](https://tuchuang.coder-sunshine.top/images/20250606142046.png)
+
+可以看到官方实现中 effect 返回了一个 runner 函数，并且 effect 实例也在上面，如果 fn 中返回值，也可以通过 手动调用 runner 拿到值
+
+- effect.ts
+
+```ts
+// 用来保存当前正在执行的 effect
+// fn 调用，那么 fn 里面的依赖就会触发相应的 get set 操作等。就可以初步建立关联关系
+export let activeSub
+
+class ReactiveEffect {
+  constructor(public fn) {}
+
+  run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+    try {
+      return this.fn()
+    } finally {
+      activeSub = prevSub
+    }
+  }
+
+  /**
+   * 通知更新的方法，如果依赖的数据发生了变化，会调用这个函数
+   */
+  notify() {
+    // 具体调用 run 方法，还是调用用户传入的 options 中的 scheduler 方法 由用户决定, 默认调用 run 方法
+    this.scheduler()
+  }
+
+  /**
+   * 默认调用 run，如果用户传了，那以用户的为主，实例属性的优先级，优先于原型属性
+   */
+  scheduler() {
+    this.run()
+  }
+}
+
+export function effect(fn, options = {}) {
+  const effect = new ReactiveEffect(fn)
+
+  // 将传入的 options 合并到 effect 上，例如传了 { scheduler: fn },那么这个 scheduler 就会覆盖原型上的
+  Object.assign(effect, options)
+
+  effect.run()
+
+  // 返回 runner 函数，可以手动执行
+  // 两种写法都可以
+  // const runner = () => effect.run()
+  const runner = effect.run.bind(effect)
+  runner.effect = effect
+  return runner
+}
+```
+
+- system.ts
+
+> [!TIP] 修改sub执行方法改为统一调用 notify 方法
+
+```ts
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    queuedEffect.push(link.sub)
+    link = link.nextSub
+  }
+
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.run()) // [!code --]
+  queuedEffect.forEach(effect => effect.notify()) // [!code ++]
+}
+```
