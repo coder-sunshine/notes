@@ -302,3 +302,88 @@ export function triggerRef(dep: Dependency) {
 
 这种链表结构使得一个响应式数据可以关联多个副作用函数，当数据变化时能够高效地通知所有相关函数进行更新。
 
+### effect 嵌套问题
+
+- 02-demo.html
+
+```js
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+effect(() => {
+  effect(() => {
+    console.log('第二个effect执行了', count.value)
+  })
+  console.log('第一个effect执行了', count.value)
+})
+
+setTimeout(() => {
+  count.value++
+}, 1000)
+```
+
+![20250606095849](https://tuchuang.coder-sunshine.top/images/20250606095849.png)
+
+可以看到如上打印顺序，为什么会这样呢？可以看到之前写的 effect 的逻辑
+
+- effect.ts
+
+```ts
+export let activeSub
+
+class ReactiveEffect {
+  constructor(public fn) {}
+
+  run() {
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+    try {
+      return this.fn()
+    } finally {
+      activeSub = undefined // [!code focus]
+    }
+  }
+}
+
+export function effect(fn) {
+  const effect = new ReactiveEffect(fn)
+  effect.run()
+}
+```
+
+> [!TIP]
+> 当 `effect1` 执行的时候，`activeSub = effect1`，然后在 `effect1` 里面又创建了 `effect2`，此时执行 `effect2` 的 `run` 方法，这时 `activeSub` 就变成了 `effect2`，等 `effect2` 执行完后，`activeSub = undefined`，但是此时的 `effect1` 还没执行完，继续访问 `effect1` 的 ref，因为 `activeSub` 是 `undefined`，所以也不会继续收集依赖了，所以这里不能单纯的设置为 `undefined`，可以在 `activeSub = this` 之前，也就是在 fn 执行之前，先把 之前的 `effect` 保存起来，执行完毕之后，再把之前的赋值给 `activeSub`。
+
+```ts
+// 用来保存当前正在执行的 effect
+// fn 调用，那么 fn 里面的依赖就会触发相应的 get set 操作等。就可以初步建立关联关系
+export let activeSub
+
+class ReactiveEffect {
+  constructor(public fn) {}
+
+  run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub // [!code ++]
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+    try {
+      return this.fn()
+    } finally {
+      activeSub = undefined // [!code --]
+      activeSub = prevSub // [!code ++]
+    }
+  }
+}
+
+export function effect(fn) {
+  const effect = new ReactiveEffect(fn)
+  effect.run()
+}
+```
+
+![20250606102151](https://tuchuang.coder-sunshine.top/images/20250606102151.png)
+
+这样打印就正常了

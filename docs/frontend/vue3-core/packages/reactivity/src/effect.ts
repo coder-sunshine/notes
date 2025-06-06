@@ -6,12 +6,15 @@ class ReactiveEffect {
   constructor(public fn) {}
 
   run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
     // 将当前的 effect 保存到全局，以便于收集依赖
     activeSub = this
     try {
       return this.fn()
     } finally {
-      activeSub = undefined
+      activeSub = prevSub
     }
   }
 }
