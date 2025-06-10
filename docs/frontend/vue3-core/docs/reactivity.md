@@ -786,3 +786,238 @@ export function link(dep: Dependency, sub: Subscriber) {
 ![20250610140535](https://tuchuang.coder-sunshine.top/images/20250610140535.png)
 
 可以看到 第一次是直接创建的新节点，后面就是一直复用当前头结点了
+
+#### 多节点复用
+
+```js
+// import { ref, effect } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const flag = ref(false)
+const count = ref(0)
+
+const e = effect(() => {
+  console.count('effect')
+  console.log(flag.value)
+  console.log(count.value)
+})
+
+btn.onclick = () => {
+  count.value++
+  console.dir(e)
+}
+```
+
+- 初始化执行
+  ![20250610153320](https://tuchuang.coder-sunshine.top/images/20250610153320.png)
+
+- 第一次点击
+  ![20250610153330](https://tuchuang.coder-sunshine.top/images/20250610153330.png)
+
+- 第二次点击
+  ![20250610153340](https://tuchuang.coder-sunshine.top/images/20250610153340.png)
+
+- 第三次点击
+  ![20250610153349](https://tuchuang.coder-sunshine.top/images/20250610153349.png)
+
+![20250610150409](https://tuchuang.coder-sunshine.top/images/20250610150409.png)
+
+- 如上图，此时复用是有问题，因为头结点 `link1` 此时是还有 `nextDep` 为 `link2` 的。
+
+- 当初**始化执行完成**后，建立上面的链表关系图。也就是把**尾结点指向 undefined**
+
+![20250610155935](https://tuchuang.coder-sunshine.top/images/20250610155935.png)
+
+- 此时点击按钮后，触发 `effect` 重新执行，然后收集依赖，当执行到 `flag.value` 的时候，此时 `sub.depsTail` 为 `undefined`,并且 `sub.deps` 有值。并且 当前节点的 `dep` 就是 `flag` 所以可以复用。最后把 `sub` 的尾结点指向 `link1`
+
+```ts
+export function link(dep: Dependency, sub: Subscriber) {
+  // 尝试复用节点
+  const currentDep = sub.depsTail // 拿到当前的尾结点
+
+  // 尾结点没值，头结点有值，说明需要复用
+  if (!currentDep && sub.deps) {
+    // 判断头结点的dep是否是当前的dep
+    if (sub.deps.dep === dep) {
+      console.log('复用当前头结点')
+      sub.depsTail = sub.deps
+      return
+    }
+  }
+  console.log('创建新节点')
+}
+```
+
+![20250610160510](https://tuchuang.coder-sunshine.top/images/20250610160510.png)
+
+- 然后继续收集 `count`,此时 `currentDep` 就不是 `undefined` 了，而是 `link1`，那么就会直接创建新节点，而不是复用。就会走创建新节点的逻辑。
+
+```ts
+// 创建一个节点
+const newLink: Link = {
+  sub,
+  dep, // link 关联的 响应式数据
+  nextDep: undefined, // 下一个依赖项节点
+  nextSub: undefined,
+  prevSub: undefined,
+}
+```
+
+首先走创建新节点的逻辑。
+![20250610170617](https://tuchuang.coder-sunshine.top/images/20250610170617.png)
+
+```ts{25-49}
+export function link(dep: Dependency, sub: Subscriber) {
+  // 尝试复用节点
+  const currentDep = sub.depsTail // 拿到当前的尾结点
+
+  // 尾结点没值，头结点有值，说明需要复用
+  if (!currentDep && sub.deps) {
+    // 判断头结点的dep是否是当前的dep
+    if (sub.deps.dep === dep) {
+      console.log('复用当前头结点')
+      sub.depsTail = sub.deps
+      return
+    }
+  }
+  console.log('创建新节点')
+
+  // 创建一个节点
+  const newLink: Link = {
+    sub,
+    dep, // link 关联的 响应式数据
+    nextDep: undefined, // 下一个依赖项节点
+    nextSub: undefined,
+    prevSub: undefined,
+  }
+
+  // 如果尾结点有，说明头结点肯定有
+  if (dep.subsTail) {
+    console.dir('dep', dep)
+    // 把新节点加到尾结点
+    dep.subsTail.nextSub = newLink
+    // 把新节点 prevSub 指向原来的尾巴
+    newLink.prevSub = dep.subsTail
+    // 更新尾结点
+    dep.subsTail = newLink
+  } else {
+    dep.subs = dep.subsTail = newLink
+  }
+
+  /**
+   * 将链表节点和 sub 建立对应关系
+   * 关联链表关系，分两种情况
+   * 1. 尾节点有，那就往尾节点后面加
+   * 2. 如果尾节点没有，则表示第一次关联，那就往头节点加，头尾相同
+   */
+  if (sub.depsTail) {
+    sub.depsTail.nextDep = newLink
+    sub.depsTail = newLink
+  } else {
+    sub.deps = sub.depsTail = newLink
+  }
+}
+```
+
+当前 `dep` 是 `count`，`dep.subsTail` 也就是 `link2`。创建dep的关联
+
+![20250610170954](https://tuchuang.coder-sunshine.top/images/20250610170954.png)
+
+然后创建 sub 和 dep 的关联
+
+![20250610171138](https://tuchuang.coder-sunshine.top/images/20250610171138.png)
+
+此时可以看到，当 `count` 更新的时候，`count` 对应的 `link2`，还有 `nextSub` ，所以触发更新的时候，就会多次触发 `effect`。
+
+> [!tip] 解决方案
+> 可以判断一下，如果尾结点还有 `nextDep`，那么就复用尾结点的 `nextDep` 就行了。
+
+```ts{7-24}
+/**
+ * 建立dep和sub的关联
+ * @param dep
+ * @param sub
+ */
+export function link(dep: Dependency, sub: Subscriber) {
+  // 尝试复用节点
+  const currentDep = sub.depsTail // 拿到当前的尾结点
+  /**
+   * 分两种情况：
+   * 1. 如果头节点有，尾节点没有，那么尝试着复用头节点
+   * 2. 如果尾节点还有 nextDep，尝试复用尾节点的 nextDep
+   */
+
+  // nextDep 为尝试复用的节点，如果尾节点为 undefined，那么就取头结点复用。
+  // 如果尾节点有值，说明是多个节点，那么就取尾结点的下一个节点复用
+  const nextDep = currentDep === undefined ? sub.deps : currentDep.nextDep
+
+  // nextDep 没值，代表 头结点都没，需要新建节点
+  if (nextDep && nextDep.dep === dep) {
+    console.log('复用当前结点')
+    sub.depsTail = nextDep
+    return
+  }
+
+  console.log('创建新节点')
+
+  // 创建一个节点
+  const newLink: Link = {
+    sub,
+    dep, // link 关联的 响应式数据
+    nextDep: undefined, // 下一个依赖项节点
+    nextSub: undefined,
+    prevSub: undefined,
+  }
+
+  // 如果尾结点有，说明头结点肯定有
+  if (dep.subsTail) {
+    console.dir('dep', dep)
+    // 把新节点加到尾结点
+    dep.subsTail.nextSub = newLink
+    // 把新节点 prevSub 指向原来的尾巴
+    newLink.prevSub = dep.subsTail
+    // 更新尾结点
+    dep.subsTail = newLink
+  } else {
+    dep.subs = dep.subsTail = newLink
+  }
+
+  /**
+   * 将链表节点和 sub 建立对应关系
+   * 关联链表关系，分两种情况
+   * 1. 尾节点有，那就往尾节点后面加
+   * 2. 如果尾节点没有，则表示第一次关联，那就往头节点加，头尾相同
+   */
+  if (sub.depsTail) {
+    sub.depsTail.nextDep = newLink
+    sub.depsTail = newLink
+  } else {
+    sub.deps = sub.depsTail = newLink
+  }
+}
+```
+
+此时当收集 `count` 的时候，`sub.depsTail` 为 `link1`，
+
+```ts
+const nextDep = currentDep === undefined ? sub.deps : currentDep.nextDep
+// nextDep 没值，代表 头结点都没，需要新建节点
+if (nextDep && nextDep.dep === dep) {
+  console.log('复用当前结点')
+  sub.depsTail = nextDep
+  return
+}
+```
+
+`nextDep` 就为 `link2`， 并且 if 判断是成立的，就复用了。
+
+![20250610175109](https://tuchuang.coder-sunshine.top/images/20250610175109.png)
+
+此时就是点一次执行一次了。
+![20250610175136](https://tuchuang.coder-sunshine.top/images/20250610175136.png)
+
+> [!IMPORTANT] 总结
+>
+> **如果头节点有，尾节点没有，那么尝试着复用头节点**
+>
+> **如果头结点有，并且尾节点还有 `nextDep`，尝试复用尾节点的 `nextDep`**

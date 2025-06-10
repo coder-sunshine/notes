@@ -42,16 +42,23 @@ export interface Link {
 export function link(dep: Dependency, sub: Subscriber) {
   // 尝试复用节点
   const currentDep = sub.depsTail // 拿到当前的尾结点
+  /**
+   * 分两种情况：
+   * 1. 如果头节点有，尾节点没有，那么尝试着复用头节点
+   * 2. 如果尾节点还有 nextDep，尝试复用尾节点的 nextDep
+   */
 
-  // 尾结点没值，头结点有值，说明需要复用
-  if (!currentDep && sub.deps) {
-    // 判断头结点的dep是否是当前的dep
-    if (sub.deps.dep === dep) {
-      console.log('复用当前头结点')
-      sub.depsTail = sub.deps
-      return
-    }
+  // nextDep 为尝试复用的节点，如果尾节点为 undefined，那么就取头结点复用。
+  // 如果尾节点有值，说明是多个节点，那么就取尾结点的下一个节点复用
+  const nextDep = currentDep === undefined ? sub.deps : currentDep.nextDep
+
+  // nextDep 没值，代表 头结点都没，需要新建节点
+  if (nextDep && nextDep.dep === dep) {
+    console.log('复用当前结点')
+    sub.depsTail = nextDep
+    return
   }
+
   console.log('创建新节点')
 
   // 创建一个节点
@@ -65,6 +72,7 @@ export function link(dep: Dependency, sub: Subscriber) {
 
   // 如果尾结点有，说明头结点肯定有
   if (dep.subsTail) {
+    console.dir('dep', dep)
     // 把新节点加到尾结点
     dep.subsTail.nextSub = newLink
     // 把新节点 prevSub 指向原来的尾巴

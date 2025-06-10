@@ -14,14 +14,17 @@
       import { ref, effect } from '../dist/reactivity.esm.js'
 
       const flag = ref(false)
+      const count = ref(0)
 
-      effect(() => {
+      const e = effect(() => {
         console.count('effect')
         console.log(flag.value)
+        console.log(count.value)
       })
 
       btn.onclick = () => {
-        flag.value = !flag.value
+        count.value++
+        console.dir(e)
       }
     </script>
   </body>

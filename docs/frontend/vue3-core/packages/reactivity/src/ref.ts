@@ -1,6 +1,6 @@
 import { ReactiveFlags } from './constants'
 import { activeSub } from './effect'
-import { Dependency, link, Link, propagate, Subscriber } from './system'
+import { Dependency, link, Link, propagate } from './system'
 
 export class RefImpl<T = any> {
   _value: T
