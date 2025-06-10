@@ -657,6 +657,8 @@ export function link(dep: Dependency, sub: Subscriber) {
 }
 ```
 
+![20250610142326](https://tuchuang.coder-sunshine.top/images/20250610142326.png)
+
 现在关联关系已经建立好了。继续分析
 
 - 当初始化执行的时候，会收集依赖，建立关系链表，第一次点击的时候，又会执行 `effect`，此时还是会**按照顺序执行**收集依赖，那么此时可以通过当前 `effect` 找到当前的头结点 `deps` ，看下 这个节点的 `dep` 是否就是 传入给 `link` 函数的 `dep`，如果相等，则代表需要收集的 `dep` 和 当前 effect 是可以复用的，那么就不创建新的节点了。
@@ -664,10 +666,11 @@ export function link(dep: Dependency, sub: Subscriber) {
 > [!TIP] 我们怎么才能知道它是重新执行，而不是第一次执行的呢？
 > vue 官方的设计是 在 每次 `fn` 执行之前，将 当前 `effect` 的尾节点 设置为 `undefined`，这样重复执行的时候，**就看头结点有没有值，头没值，则是第一次执行，头结点有值，尾结点没值，就代表是重复执行的，那么就不创建新的节点，直接复用**
 
+![20250610142432](https://tuchuang.coder-sunshine.top/images/20250610142432.png)
+
 - effect.ts
 
 ```ts
-x
 class ReactiveEffect {
   // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
 
