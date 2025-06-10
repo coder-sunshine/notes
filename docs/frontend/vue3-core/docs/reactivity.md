@@ -500,3 +500,286 @@ export function propagate(subs: Link) {
   queuedEffect.forEach(effect => effect.notify()) // [!code ++]
 }
 ```
+
+### 节点复用问题
+
+#### 单节点复用
+
+```js
+// import { ref, effect } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const flag = ref(false)
+
+effect(() => {
+  console.count('effect')
+  console.log(flag.value)
+})
+
+btn.onclick = () => {
+  flag.value = !flag.value
+}
+```
+
+执行 `effect`，建立 `flag` 和 `effect` 的关联，当改变了 `flag` 的时候，那么触发 `effect` 的重新执行，但是此时 又会创建新的 link 节点，将 flag 和 effect 关联，也就导致了重复收集了。
+
+- 第一次执行 effect
+  ![20250610103356](https://tuchuang.coder-sunshine.top/images/20250610103356.png)
+
+- 点击按钮
+  ![20250610103419](https://tuchuang.coder-sunshine.top/images/20250610103419.png)
+- 再点按钮
+  ![20250610103434](https://tuchuang.coder-sunshine.top/images/20250610103434.png)
+- 再点按钮
+  ![20250610103447](https://tuchuang.coder-sunshine.top/images/20250610103447.png)
+
+可以发现成指数级触发 effect。为什么呢？可以看下图
+![20250610103838](https://tuchuang.coder-sunshine.top/images/20250610103838.png)
+
+> [!TIP] 初始化执行，也就是 effect 第一次自动执行
+> 当 `effect` 执行的时候，收集依赖，生成新的节点 `link1`，`flag` 的 `subs` 和 `subsTail` 都指向 `link1`，`link1` 的 `sub` 执行 `effect`
+
+![20250610104930](https://tuchuang.coder-sunshine.top/images/20250610104930.png)
+
+> [!TIP] 第一次点击
+> 点击后找到 `link1` 对应的 `effect` 重新执行，那么此时 又访问到了 `flag.value`，此时又会进行依赖收集，导致又会创建新的节点,当再次点击的时候就会导致触发多个相同的 `effect`。
+
+那应该怎样处理呢？
+
+> [!TIP] 给 effect 添加 dep 的链表关系
+> 可以想到，因为一直都是 `effect` 和 `flag` 之间关联，那么我们只需要去复用这个关联关系就行了，也就是复用 `link1`，当 `effect` 在执行的时候，可以想办法拿到当前 `effect` 关联的 响应式数据，然后再执行之前，判断下当前 `effect` 和 这个响应式数据有没有建立过对应关系，如果建立过了，那么就直接复用就行了。
+> 可以给 `effect` 添加 `deps` 和 `depsTail` 的单向链表，来记录 `effect` 关联了哪些 响应式数据
+
+- effect.ts
+
+```ts
+class ReactiveEffect {
+  // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
+
+  /**
+   * 依赖项链表的头节点
+   */
+  deps?: Link // [!code ++]
+
+  /**
+   * 依赖项链表的尾节点
+   */
+  depsTail?: Link // [!code ++]
+
+  constructor(public fn) {}
+
+  run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+    try {
+      return this.fn()
+    } finally {
+      activeSub = prevSub
+    }
+  }
+
+  /**
+   * 通知更新的方法，如果依赖的数据发生了变化，会调用这个函数
+   */
+  notify() {
+    // 具体调用 run 方法，还是调用用户传入的 options 中的 scheduler 方法 由用户决定, 默认调用 run 方法
+    this.scheduler()
+  }
+
+  /**
+   * 默认调用 run，如果用户传了，那以用户的为主，实例属性的优先级，优先于原型属性
+   */
+  scheduler() {
+    this.run()
+  }
+}
+```
+
+- system.ts
+
+```ts
+/**
+ * 订阅者
+ */
+export interface Subscriber {
+  // 依赖项链表的头节点
+  deps?: Link
+  // 依赖项链表的尾节点
+  depsTail?: Link
+}
+```
+
+- system.ts
+
+```ts{10-11,28-39}
+/**
+ * 建立dep和sub的关联
+ * @param dep
+ * @param sub
+ */
+export function link(dep: Dependency, sub: Subscriber) {
+  // 创建一个节点
+  const newLink: Link = {
+    sub,
+    dep, // link 关联的 响应式数据
+    nextDep: undefined, // 下一个依赖项节点
+    nextSub: undefined,
+    prevSub: undefined,
+  }
+
+  // 如果尾结点有，说明头结点肯定有
+  if (dep.subsTail) {
+    // 把新节点加到尾结点
+    dep.subsTail.nextSub = newLink
+    // 把新节点 prevSub 指向原来的尾巴
+    newLink.prevSub = dep.subsTail
+    // 更新尾结点
+    dep.subsTail = newLink
+  } else {
+    dep.subs = dep.subsTail = newLink
+  }
+
+  /**
+   * 将链表节点和 sub 建立对应关系
+   * 关联链表关系，分两种情况
+   * 1. 尾节点有，那就往尾节点后面加
+   * 2. 如果尾节点没有，则表示第一次关联，那就往头节点加，头尾相同
+   */
+  if (sub.depsTail) {
+    sub.depsTail.nextDep = newLink
+    sub.depsTail = newLink
+  } else {
+    sub.deps = sub.depsTail = newLink
+  }
+}
+```
+
+现在关联关系已经建立好了。继续分析
+
+- 当初始化执行的时候，会收集依赖，建立关系链表，第一次点击的时候，又会执行 `effect`，此时还是会**按照顺序执行**收集依赖，那么此时可以通过当前 `effect` 找到当前的头结点 `deps` ，看下 这个节点的 `dep` 是否就是 传入给 `link` 函数的 `dep`，如果相等，则代表需要收集的 `dep` 和 当前 effect 是可以复用的，那么就不创建新的节点了。
+
+> [!TIP] 我们怎么才能知道它是重新执行，而不是第一次执行的呢？
+> vue 官方的设计是 在 每次 `fn` 执行之前，将 当前 `effect` 的尾节点 设置为 `undefined`，这样重复执行的时候，**就看头结点有没有值，头没值，则是第一次执行，头结点有值，尾结点没值，就代表是重复执行的，那么就不创建新的节点，直接复用**
+
+- effect.ts
+
+```ts
+x
+class ReactiveEffect {
+  // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
+
+  /**
+   * 依赖项链表的头节点
+   */
+  deps?: Link
+
+  /**
+   * 依赖项链表的尾节点
+   */
+  depsTail?: Link
+
+  constructor(public fn) {}
+
+  run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    // 这里在开始执行之前，将 depsTail 设置成 undefined
+    this.depsTail = undefined // [!code ++]
+    try {
+      return this.fn()
+    } finally {
+      activeSub = prevSub
+    }
+  }
+
+  /**
+   * 通知更新的方法，如果依赖的数据发生了变化，会调用这个函数
+   */
+  notify() {
+    // 具体调用 run 方法，还是调用用户传入的 options 中的 scheduler 方法 由用户决定, 默认调用 run 方法
+    this.scheduler()
+  }
+
+  /**
+   * 默认调用 run，如果用户传了，那以用户的为主，实例属性的优先级，优先于原型属性
+   */
+  scheduler() {
+    this.run()
+  }
+}
+```
+
+- system.ts
+
+```ts{7-19}
+/**
+ * 建立dep和sub的关联
+ * @param dep
+ * @param sub
+ */
+export function link(dep: Dependency, sub: Subscriber) {
+  // 尝试复用节点
+  const currentDep = sub.depsTail // 拿到当前的尾结点
+
+  // 尾结点没值，头结点有值，说明需要复用
+  if (!currentDep && sub.deps) {
+    // 判断头结点的dep是否是当前的dep
+    if (sub.deps.dep === dep) {
+      console.log('复用当前头结点')
+      sub.depsTail = sub.deps
+      return
+    }
+  }
+  console.log('创建新节点')
+  // 创建一个节点
+  const newLink: Link = {
+    sub,
+    dep, // link 关联的 响应式数据
+    nextDep: undefined, // 下一个依赖项节点
+    nextSub: undefined,
+    prevSub: undefined,
+  }
+
+  // 如果尾结点有，说明头结点肯定有
+  if (dep.subsTail) {
+    // 把新节点加到尾结点
+    dep.subsTail.nextSub = newLink
+    // 把新节点 prevSub 指向原来的尾巴
+    newLink.prevSub = dep.subsTail
+    // 更新尾结点
+    dep.subsTail = newLink
+  } else {
+    dep.subs = dep.subsTail = newLink
+  }
+
+  /**
+   * 将链表节点和 sub 建立对应关系
+   * 关联链表关系，分两种情况
+   * 1. 尾节点有，那就往尾节点后面加
+   * 2. 如果尾节点没有，则表示第一次关联，那就往头节点加，头尾相同
+   */
+  if (sub.depsTail) {
+    sub.depsTail.nextDep = newLink
+    sub.depsTail = newLink
+  } else {
+    sub.deps = sub.depsTail = newLink
+  }
+}
+```
+
+![20250610140535](https://tuchuang.coder-sunshine.top/images/20250610140535.png)
+
+可以看到 第一次是直接创建的新节点，后面就是一直复用当前头结点了

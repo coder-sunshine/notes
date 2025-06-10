@@ -1,8 +1,23 @@
 // 用来保存当前正在执行的 effect
+
+import { Link } from './system'
+
 // fn 调用，那么 fn 里面的依赖就会触发相应的 get set 操作等。就可以初步建立关联关系
 export let activeSub
 
 class ReactiveEffect {
+  // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
+
+  /**
+   * 依赖项链表的头节点
+   */
+  deps?: Link
+
+  /**
+   * 依赖项链表的尾节点
+   */
+  depsTail?: Link
+
   constructor(public fn) {}
 
   run() {
@@ -11,6 +26,15 @@ class ReactiveEffect {
 
     // 将当前的 effect 保存到全局，以便于收集依赖
     activeSub = this
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    // 这里在开始执行之前，将 depsTail 设置成 undefined
+    this.depsTail = undefined
     try {
       return this.fn()
     } finally {
