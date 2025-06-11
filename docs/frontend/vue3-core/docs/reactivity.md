@@ -1021,3 +1021,351 @@ if (nextDep && nextDep.dep === dep) {
 > **如果头节点有，尾节点没有，那么尝试着复用头节点**
 >
 > **如果头结点有，并且尾节点还有 `nextDep`，尝试复用尾节点的 `nextDep`**
+
+### 分支切换和依赖清理
+
+```js
+// import {
+//   ref,
+//   effect,
+// } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const flag = ref(true)
+const name = ref('sunshine')
+const age = ref(18)
+
+effect(() => {
+  console.count('effect')
+  // 需要根据 flag 的值， 来决定 effect 的依赖项是什么，把不需要的依赖给清理掉
+  if (flag.value) {
+    app.innerHTML = name.value
+  } else {
+    app.innerHTML = age.value
+  }
+})
+
+flagBtn.onclick = () => {
+  flag.value = !flag.value
+}
+
+nameBtn.onclick = () => {
+  // 如果 flag 为 true，那么 name 就是依赖项，如果 flag 为 false，那么 name 就不是依赖项，需要清理掉
+  name.value = name.value + Math.random()
+}
+
+ageBtn.onclick = () => {
+  // 如果 flag 为 true，那么 age 就是依赖项，如果 flag 为 false，那么 age 就不是依赖项，需要清理掉
+  age.value++
+}
+```
+
+上面这段代码初始化展示的是名字，点击按钮修改名字不会有问题，问题在于当修改了 `flag` 为 `false` 后,在修改年龄没问题，但是此时修改名字,由于 `effect` 中之前 `flag` 为 `true`,所以也会收集对应依赖，所以 `effect` 还是会继续执行，**也就是切换分支后，之前依赖没有被清理掉**
+
+- **初始化后的关系图，此时只收集到了 flag 和 name 的依赖**
+
+![20250611100228](https://tuchuang.coder-sunshine.top/images/20250611100228.png)
+
+- 点击 `update flag` 后改为 `false`, 触发 `effect` 重新执行，此时尾结点 指向 `undefined`。
+
+![20250611100526](https://tuchuang.coder-sunshine.top/images/20250611100526.png)
+
+- 然后执行 `link` 函数，尝试复用节点，`link1` 能复用上
+
+![20250611100747](https://tuchuang.coder-sunshine.top/images/20250611100747.png)
+
+- 此时 `depsTail` 为 `link1`,也有 `nextDep`，但是此时 `dep` 为 `age`（因为`flag` 为`false`,分支切换了）。和 `link2` 的 `dep` 对应的 `name` 不相同，所以不能复用， 需要创建新的节点。
+
+![20250611101915](https://tuchuang.coder-sunshine.top/images/20250611101915.png)
+
+创建新的节点 age，
+
+```ts
+if (sub.depsTail) {
+  sub.depsTail.nextDep = newLink
+  sub.depsTail = newLink
+} else {
+  sub.deps = sub.depsTail = newLink
+}
+```
+
+> [!WARNING] 分析
+> 此时 `link1` 的 `nextDep` 指向 `link2`，`sub` 的 `depsTail` 指向 `link2`。可以看到 `effect` 的 `dep` 链表里面已经没有 `name` 了，但是当修改 name 的值后，还是可以通过 name 对应的 link2 的 sub 找到 effect 重新执行。
+
+想办法清理对应的依赖，使其不重新执行
+
+> [!IMPORTANT] 解决方案
+> 在创建新节点的时候，把新节点的 nextDep 赋值为 上一个没有复用上的节点。其他照旧执行，那么最后 depsTail 的 nextDep 就是需要被清理的依赖。
+
+![20250611102908](https://tuchuang.coder-sunshine.top/images/20250611102908.png)
+
+- system.ts
+
+```ts
+// 创建一个节点
+const newLink: Link = {
+  sub,
+  dep, // link 关联的 响应式数据
+  nextDep: undefined, // 下一个依赖项节点 [!code --]
+  nextDep, // 将没复用上的节点作为新节点的 nextDep [!code ++]
+  nextSub: undefined,
+  prevSub: undefined,
+}
+```
+
+- effect.ts
+
+```ts
+run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    // 这里在开始执行之前，将 depsTail 设置成 undefined
+    this.depsTail = undefined
+    try {
+      return this.fn()
+    } finally {
+      if(this.depsTail.nextDep) {
+        console.log('需要被清理的依赖', this.depsTail.nextDep)
+      }
+      activeSub = prevSub
+    }
+  }
+```
+
+- 点击 flag，可以看到需要被清理的依赖是 name
+
+![20250611104236](https://tuchuang.coder-sunshine.top/images/20250611104236.png)
+
+- 再次点击，可以发现需要被清理的是 age
+
+![20250611104325](https://tuchuang.coder-sunshine.top/images/20250611104325.png)
+
+- 还有一种情况是，当头结点有，尾节点没有，那么需要清理所有的依赖
+
+```js
+// import {
+//   ref,
+//   effect,
+// } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const flag = ref(true)
+const name = ref('sunshine')
+const age = ref(18)
+
+let count = 0
+
+effect(() => {
+  console.count('effect')
+
+  if (count > 0) {
+    return
+  }
+  count++
+  // 需要根据 flag 的值， 来决定 effect 的依赖项是什么，把不需要的依赖给清理掉
+  if (flag.value) {
+    app.innerHTML = name.value
+  } else {
+    app.innerHTML = age.value
+  }
+})
+
+flagBtn.onclick = () => {
+  flag.value = !flag.value
+}
+
+nameBtn.onclick = () => {
+  // 如果 flag 为 true，那么 name 就是依赖项，如果 flag 为 false，那么 name 就不是依赖项，需要清理掉
+  name.value = name.value + Math.random()
+}
+
+ageBtn.onclick = () => {
+  // 如果 flag 为 true，那么 age 就是依赖项，如果 flag 为 false，那么 age 就不是依赖项，需要清理掉
+  age.value++
+}
+```
+
+- system.ts
+
+```ts
+run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    // 这里在开始执行之前，将 depsTail 设置成 undefined
+    this.depsTail = undefined
+    try {
+      return this.fn()
+    } finally {
+      if (this.depsTail) {
+        if (this.depsTail.nextDep) {
+          console.log('需要被清理的依赖', this.depsTail.nextDep)
+        }
+      } else if (this.deps) {
+        console.log('需要被清理的依赖', this.deps)
+      }
+      activeSub = prevSub
+    }
+  }
+```
+
+也就是 `count` 大于 0 后，后面的依赖就收集不到了。
+![20250611111408](https://tuchuang.coder-sunshine.top/images/20250611111408.png)
+
+**这个时候就找到了需要被清理的依赖了，然后处理就行了**
+
+![20250611144242](https://tuchuang.coder-sunshine.top/images/20250611144242.png)
+
+当 `name` 有可能依赖多个 `effect`，只能清理掉和当前 `effect` 的关系，不能乱清理
+
+- effect.ts
+
+```ts{14,19-20}
+run() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    activeSub = this
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    startTrack(this)
+
+    try {
+      return this.fn()
+    } finally {
+      // 结束追踪，找到需要清理的依赖，断开关联关系
+      endTrack(this)
+
+      activeSub = prevSub
+    }
+  }
+```
+
+fn 执行之前还是 将 尾结点 设置尾 `undefined`，执行完后 就开始 清理依赖
+
+- system.ts
+
+```ts
+/**
+ * 开始追踪依赖，将depsTail，尾节点设置成 undefined
+ * @param sub
+ */
+export function startTrack(sub: Subscriber) {
+  sub.depsTail = undefined
+}
+
+/**
+ * 结束追踪，找到需要清理的依赖，断开关联关系
+ * @param sub
+ */
+export function endTrack(sub: Subscriber) {
+  const depsTail = sub.depsTail
+
+  /**
+   * depsTail 有，并且 depsTail 还有 nextDep ，就把它们的依赖关系清理掉
+   * depsTail 没有，并且头节点有，那就把所有的都清理掉（这个是没有收集到依赖，比如在 effect 第一句写个判断，为真执行下面，为假直接return ，那么后面就不用收集依赖了 ）
+   */
+
+  if (depsTail) {
+    if (depsTail.nextDep) {
+      // 将需要清理的依赖传进去
+      clearTracking(depsTail.nextDep)
+      // 清理完毕后，将 depsTail.nextDep 设置成 undefined
+      depsTail.nextDep = undefined
+    }
+  } else if (sub.deps) {
+    clearTracking(sub.deps)
+    // 清理完毕后，将 sub.deps 设置成 undefined
+    sub.deps = undefined
+  }
+}
+```
+
+```ts
+/**
+ * 清理依赖关系
+ * @param link
+ */
+function clearTracking(link: Link) {
+  // 清理依赖
+  while (link) {
+    const { dep, nextDep, nextSub, prevSub } = link
+
+    // 如果当前 link 的 prevSub 有值，则代表不是头节点，则把上一个的 nextSub 指向 link 的 nextSub
+    if (prevSub) {
+      // 把上一个的 nextSub 指向 link 的 nextSub
+      prevSub.nextSub = nextSub
+      // 把 link 的 nextSub 断开
+      link.nextSub = undefined
+    } else {
+      // prevSub 没值，则代表是头节点，则把头结点指向 nextSub
+      dep.subs = nextSub
+    }
+
+    // 如果下一个有，那就把 nextSub 的上一个节点，指向当前节点的上一个节点
+    if (nextSub) {
+      nextSub.prevSub = prevSub
+      // 断开 link 的 prevSub
+      link.prevSub = undefined
+    } else {
+      // 如果下一个没有，那它就是尾节点，把 dep.depsTail 指向上一个节点
+      dep.subsTail = prevSub
+    }
+
+    // 最后断开 link 的 dep sub 以及 nextDep
+    link.dep = link.sub = undefined
+    link.nextDep = undefined
+
+    link = nextDep
+  }
+}
+```
+
+![20250611144242](https://tuchuang.coder-sunshine.top/images/20250611144242.png)
+
+- 分几种情况
+
+  1. 上一个节点有值，也就是 `link` 的 `prevSub` 有值，则代表不是头结点，则把上一个的 `nextSub` 指向 `link` 的 `nextSub`,然后断开 `link` 的 `nextSub`
+  2. 上一个节点没值，则代表是头结点，直接把头结点指向 `nextSub` 就行了
+  3. 下一个节点有值，也就是 `link` 的 `nextSub` 有值，那就把 `nextSub` 的上一个节点，指向当前节点的上一个节点,然后断开 `link` 的 `prevSub`。
+  4. 下一个节点没值，则代表是尾节点，则把尾节点指向上一个节点就行了，也就是 `prevSub`
+
+- 最后断开 `link` 的 `dep` `sub` 以及 `nextDep` 之间的关联，然后开始下一轮循环
+
+这样过后 当切换 `flag` 过后，只会触发对应的依赖了，点击其他按钮不会触发 `effect` 重新执行
+
+![20250611153634](https://tuchuang.coder-sunshine.top/images/20250611153634.png)
+
+当 `count` 大于 0 这种情况，时候，也只会触发两次 `effect` 执行，初始化一次，点击按钮后一次，第二次就收集不到依赖了，后面就一直不触发了
+
+> [!IMPORTANT] 总结 - 为何需要清理依赖
+> 内存管理：防止内存泄漏
+>
+> 性能优化：避免不必要的更新计算
+>
+> 确保正确性：保证响应式系统的依赖关系准确性

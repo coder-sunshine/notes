@@ -54,25 +54,21 @@ export function link(dep: Dependency, sub: Subscriber) {
 
   // nextDep 没值，代表 头结点都没，需要新建节点
   if (nextDep && nextDep.dep === dep) {
-    console.log('复用当前结点')
     sub.depsTail = nextDep
     return
   }
-
-  console.log('创建新节点')
 
   // 创建一个节点
   const newLink: Link = {
     sub,
     dep, // link 关联的 响应式数据
-    nextDep: undefined, // 下一个依赖项节点
+    nextDep, // 将没复用上的节点作为新节点的 nextDep
     nextSub: undefined,
     prevSub: undefined,
   }
 
   // 如果尾结点有，说明头结点肯定有
   if (dep.subsTail) {
-    console.dir('dep', dep)
     // 把新节点加到尾结点
     dep.subsTail.nextSub = newLink
     // 把新节点 prevSub 指向原来的尾巴
@@ -114,4 +110,76 @@ export function propagate(subs: Link) {
 
   // 拿到所有的sub执行
   queuedEffect.forEach(effect => effect.notify())
+}
+
+/**
+ * 开始追踪依赖，将depsTail，尾节点设置成 undefined
+ * @param sub
+ */
+export function startTrack(sub: Subscriber) {
+  sub.depsTail = undefined
+}
+
+/**
+ * 结束追踪，找到需要清理的依赖，断开关联关系
+ * @param sub
+ */
+export function endTrack(sub: Subscriber) {
+  const depsTail = sub.depsTail
+
+  /**
+   * depsTail 有，并且 depsTail 还有 nextDep ，就把它们的依赖关系清理掉
+   * depsTail 没有，并且头节点有，那就把所有的都清理掉（这个是没有收集到依赖，比如在 effect 第一句写个判断，为真执行下面，为假直接return ，那么后面就不用收集依赖了 ）
+   */
+
+  if (depsTail) {
+    if (depsTail.nextDep) {
+      // 将需要清理的依赖传进去
+      clearTracking(depsTail.nextDep)
+      // 清理完毕后，将 depsTail.nextDep 设置成 undefined
+      depsTail.nextDep = undefined
+    }
+  } else if (sub.deps) {
+    clearTracking(sub.deps)
+    // 清理完毕后，将 sub.deps 设置成 undefined
+    sub.deps = undefined
+  }
+}
+
+/**
+ * 清理依赖关系
+ * @param link
+ */
+function clearTracking(link: Link) {
+  // 清理依赖
+  while (link) {
+    const { dep, nextDep, nextSub, prevSub } = link
+
+    // 如果当前 link 的 prevSub 有值，则代表不是头节点，则把上一个的 nextSub 指向 link 的 nextSub
+    if (prevSub) {
+      // 把上一个的 nextSub 指向 link 的 nextSub
+      prevSub.nextSub = nextSub
+      // 把 link 的 nextSub 断开
+      link.nextSub = undefined
+    } else {
+      // prevSub 没值，则代表是头节点，则把头结点指向 nextSub
+      dep.subs = nextSub
+    }
+
+    // 如果下一个有，那就把 nextSub 的上一个节点，指向当前节点的上一个节点
+    if (nextSub) {
+      nextSub.prevSub = prevSub
+      // 断开 link 的 prevSub
+      link.prevSub = undefined
+    } else {
+      // 如果下一个没有，那它就是尾节点，把 dep.depsTail 指向上一个节点
+      dep.subsTail = prevSub
+    }
+
+    // 最后断开 link 的 dep sub 以及 nextDep
+    link.dep = link.sub = undefined
+    link.nextDep = undefined
+
+    link = nextDep
+  }
 }

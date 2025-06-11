@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <button id="flagBtn">update flag</button>
+    <button id="nameBtn">update name</button>
+    <button id="ageBtn">update age</button>
+
+    <script type="module">
+      // import {
+      //   ref,
+      //   effect,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+      import { ref, effect } from '../dist/reactivity.esm.js'
+
+      const flag = ref(true)
+      const name = ref('sunshine')
+      const age = ref(18)
+
+      let count = 0
+
+      effect(() => {
+        console.count('effect')
+
+        if (count > 0) {
+          return
+        }
+        count++
+        // 需要根据 flag 的值， 来决定 effect 的依赖项是什么，把不需要的依赖给清理掉
+        if (flag.value) {
+          app.innerHTML = name.value
+        } else {
+          app.innerHTML = age.value
+        }
+      })
+
+      flagBtn.onclick = () => {
+        flag.value = !flag.value
+      }
+
+      nameBtn.onclick = () => {
+        // 如果 flag 为 true，那么 name 就是依赖项，如果 flag 为 false，那么 name 就不是依赖项，需要清理掉
+        name.value = name.value + Math.random()
+      }
+
+      ageBtn.onclick = () => {
+        // 如果 flag 为 true，那么 age 就是依赖项，如果 flag 为 false，那么 age 就不是依赖项，需要清理掉
+        age.value++
+      }
+    </script>
+  </body>
+</html>

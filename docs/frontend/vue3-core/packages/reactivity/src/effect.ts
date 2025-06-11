@@ -1,6 +1,6 @@
 // 用来保存当前正在执行的 effect
 
-import { Link } from './system'
+import { endTrack, Link, startTrack } from './system'
 
 // fn 调用，那么 fn 里面的依赖就会触发相应的 get set 操作等。就可以初步建立关联关系
 export let activeSub
@@ -33,11 +33,14 @@ class ReactiveEffect {
      * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
      */
 
-    // 这里在开始执行之前，将 depsTail 设置成 undefined
-    this.depsTail = undefined
+    startTrack(this)
+
     try {
       return this.fn()
     } finally {
+      // 结束追踪，找到需要清理的依赖，断开关联关系
+      endTrack(this)
+
       activeSub = prevSub
     }
   }
