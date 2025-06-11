@@ -11,6 +11,9 @@ hero:
     alt: 背景图
   actions:
     - theme: brand
+      text: Vue3源码解析
+      link: /docs/frontend/vue3-core/docs
+    - theme: brand
       text: React
       link: /docs/frontend/react/hook-test
     - theme: brand
