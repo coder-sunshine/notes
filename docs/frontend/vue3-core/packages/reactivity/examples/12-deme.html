@@ -12,6 +12,7 @@
       // import {
       //   ref,
       //   effect,
+      //   reactive,
       // } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
       import { ref, effect, reactive } from '../dist/reactivity.esm.js'
 
@@ -21,14 +22,16 @@
       })
 
       effect(() => {
-        console.log(state.value)
+        console.log(state.value.a)
       })
 
       setTimeout(() => {
-        // state.value.a = 10
-        state.value = {
-          c: 10,
-        }
+        // 监听不到更改。
+        state.value.a = 10
+        // 可以监听到更改
+        // state.value = {
+        //   a: 10,
+        // }
       }, 1000)
     </script>
   </body>

@@ -11,7 +11,7 @@ class Dep {
   constructor() {}
 }
 
-export function reactive(target: object) {
+export function reactive(target) {
   return createReactiveObject(target)
 }
 

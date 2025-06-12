@@ -2262,3 +2262,76 @@ const mutableHandlers = {
 这样就只有 `变化了` 才会 `trigger` 了
 
 #### ref 传对象情况处理
+
+ref 如果传递的是对象的话，需要把 ref 转为 reactive 来处理，因为 .value 触发的是 get 操作，不能监听到深层次的修改。
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const state = ref({
+  a: 1,
+  b: 2,
+})
+
+effect(() => {
+  console.log(state.value.a)
+})
+
+setTimeout(() => {
+  // 监听不到更改。
+  // state.value.a = 10
+  // 可以监听到更改
+  state.value = {
+    a: 10,
+  }
+}, 1000)
+```
+
+![20250612205147](https://tuchuang.coder-sunshine.top/images/20250612205147.png)
+
+![20250612205202](https://tuchuang.coder-sunshine.top/images/20250612205202.png)
+
+上面图片分别对应两种情况, 第二种是可以检测到改变的
+
+```ts{18-19,30-36}
+export class RefImpl<T = any> {
+  _value: T
+
+  // ref标记
+  public readonly [ReactiveFlags.IS_REF] = true
+
+  /**
+   * 订阅者链表的头节点
+   */
+  subs: Link
+
+  /**
+   * 订阅者链表的尾节点
+   */
+  subsTail: Link
+
+  constructor(value: T) {
+    // 如果 value 是对象，那么就使用 reactive 转换成响应式对象
+    this._value = isObject(value) ? reactive(value) : value
+  }
+
+  get value() {
+    if (activeSub) {
+      trackRef(this)
+    }
+    return this._value
+  }
+
+  set value(newVal) {
+    if (hasChanged(newVal, this._value)) {
+      // 只有在 值发生变化之后，才触发更新
+      // 触发更新
+      this._value = isObject(newVal) ? reactive(newVal) : newVal
+
+      triggerRef(this)
+    }
+  }
+}
+```
+
+这样无论那种写法都可以触发更新了。
