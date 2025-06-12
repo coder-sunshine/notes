@@ -2260,3 +2260,5 @@ const mutableHandlers = {
 ![20250612161339](https://tuchuang.coder-sunshine.top/images/20250612161339.png)
 
 这样就只有 `变化了` 才会 `trigger` 了
+
+#### ref 传对象情况处理
