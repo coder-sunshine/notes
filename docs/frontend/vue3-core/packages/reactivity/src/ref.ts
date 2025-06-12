@@ -23,7 +23,9 @@ export class RefImpl<T = any> {
   }
 
   get value() {
-    trackRef(this)
+    if (activeSub) {
+      trackRef(this)
+    }
     return this._value
   }
 
@@ -60,7 +62,7 @@ export function isRef(value: any) {
  * @param dep
  */
 export function trackRef(dep: Dependency) {
-  activeSub && link(dep, activeSub)
+  link(dep, activeSub)
 }
 
 /**
@@ -70,4 +72,3 @@ export function trackRef(dep: Dependency) {
 export function triggerRef(dep: Dependency) {
   dep.subs && propagate(dep.subs)
 }
-

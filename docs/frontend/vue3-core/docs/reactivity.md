@@ -1647,7 +1647,8 @@ export function propagate(subs: Link) {
 
     const sub = link.sub // [!code ++]
     // 如果sub正在收集依赖，则不触发effect执行
-    if (!sub.tracking) { // [!code ++]
+    if (!sub.tracking) {
+      // [!code ++]
       // [!code ++]
       queuedEffect.push(sub) // [!code ++]
     } // [!code ++]
@@ -1659,3 +1660,217 @@ export function propagate(subs: Link) {
   queuedEffect.forEach(effect => effect.notify())
 }
 ```
+
+### reactive 实现
+
+`reactive` 接收一个对象,`vue3`是使用 `proxy` 去代理然后触发 `get` 和 `set` 来实现响应式的。
+
+- shared/src/general.ts
+
+```ts
+export const isObject = (val: unknown): val is Record<any, any> => val !== null && typeof val === 'object'
+```
+
+- reactive.ts
+
+```ts
+import { isObject } from '@vue/shared'
+
+export function reactive(target: object) {
+  return createReactiveObject(target)
+}
+
+/**
+ * 创建响应式对象
+ * @param target 目标对象
+ * @returns 返回代理对象
+ */
+export function createReactiveObject(target) {
+  // 如果不是对象，直接返回
+  if (!isObject(target)) {
+    return target
+  }
+
+  // 创建代理对象
+  const proxy = new Proxy(target, {
+    get(target, key) {
+      /**
+       * 收集依赖
+       * 绑定 target 中的某一个 key 和 sub 之间的关系
+       */
+      track(target, key)
+
+      return Reflect.get(target, key)
+    },
+    set(target, key, value) {
+      const res = Reflect.set(target, key, value)
+
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+
+      return res
+    },
+  })
+
+  return proxy
+}
+
+export function track(target, key) {
+  console.log('track', target, key)
+}
+
+export function trigger(target, key) {
+  console.log('trigger', target, key)
+}
+```
+
+- 收集依赖
+  之前是在 link 函数里面去建立对应关系节点，传入了 dep 和 sub，但是 目前 track 函数里面只能拿到 activeSub，还差一个 dep 参数，之前 RefImpl 上面挂载了 deps 和 depsTail，现在可以模仿着构造一个 dep 出来就行了
+
+```ts
+class Dep {
+  // 订阅者链表的头节点
+  subs?: Link
+  // 订阅者链表的尾节点
+  subsTail?: Link
+
+  constructor() {}
+}
+
+export function track(target, key) {
+  // 收集依赖，之前是在 link 函数里面，传了 dep 和 sub，现在 这里只能拿到 activeSub，还差 dep
+  // 之前 RefImpl 就是 dep，上面有 deps 和 depsTail，现在可以再构造一个 dep，也实现这两个
+
+  /** 这样去处理就行了
+   * const dep = new Dep()
+   * link(dep, activeSub)
+   */
+
+  console.log('track', target, key)
+}
+```
+
+那这个 `dep` 要怎样串起来呢？可以用 `map` 结构来保存 `target` 和 `key` 之间的关联关系，再用 `map` 结构保存 `key` 和 `dep` 之间的关联就行了。这样在触发 更新的时候，就可以通过 `target` 和 `key` 找到对应的 `dep`，然后触发 `dep` 的 `sub` 重新执行就行了
+
+- **targetMap:** 存储所有响应式对象的依赖关系
+- **depsMap:** 存储某个对象的所有属性依赖
+- **dep:** 存储某个属性的所有订阅者
+
+**伪代码如下**
+
+```js
+const obj = {
+  a: 1,
+  b: 2,
+}
+
+targetMap = {
+  [obj]: {
+    a: Dep,
+    b: Dep,
+  },
+}
+
+depsMap = {
+  a: Dep,
+  b: Dep,
+}
+```
+
+> [!TIP] targetMap 为什么需要使用 weakMap?
+>
+> 1. `WeakMap` 是一种键值对的集合，其中的键**必须是对象或非全局注册的符号**，并且不会创建对键的强引用，**换句话说，一个对象作为 `WeakMap` 的键存在，不会阻止该对象被垃圾回收**。
+> 2. `WeakMap` 只能做映射，不能做遍历这些操作，也没有 `size`
+
+> [!TIP] depsMap 为啥不用 weakMap呢？
+>
+> 1. 因为 `WeakMap` 的键必须是**对象或非全局注册的符号**, `reactive` 接受的是一个对象，不能保证 `key` 是一个对象，所以得用 `map` 才行
+
+- reactive.ts
+
+```ts
+export function track(target, key) {
+  // 收集依赖，之前是在 link 函数里面，传了 dep 和 sub，现在 这里只能拿到 activeSub，还差 dep
+  // 之前 RefImpl 就是 dep，上面有 deps 和 depsTail，现在可以再构造一个 dep，也实现这两个
+
+  /**
+   * const dep = new Dep()
+   * link(dep, activeSub)
+   */
+
+  // 通过 targetMap 获取 depsMap
+  let depsMap = targetMap.get(target)
+
+  if (!depsMap) {
+    targetMap.set(target, (depsMap = new Map()))
+  }
+
+  // 通过 depsMap 获取 dep
+  let dep = depsMap.get(key)
+
+  if (!dep) {
+    depsMap.set(key, (dep = new Dep()))
+  }
+
+  // 绑定 dep 和 sub 的关系
+  link(dep, activeSub)
+  console.log(targetMap)
+}
+```
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 0,
+  b: 1,
+})
+
+effect(() => {
+  console.log(state.a++)
+})
+```
+
+![20250612140717](https://tuchuang.coder-sunshine.top/images/20250612140717.png)
+
+- 触发更新
+  触发更新就比较简单了,直接从 `targetMap` 中通过 `target` 和 `key` 找到对应的 `dep`，然后触发更新就行了。
+
+```ts
+export function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) {
+    return
+  }
+
+  const dep = depsMap.get(key)
+  if (!dep) {
+    return
+  }
+
+  // 通知 dep 对应的subs执行
+  propagate(dep.subs)
+}
+```
+
+![20250612144043](https://tuchuang.coder-sunshine.top/images/20250612144043.png)
+
+![20250612144054](https://tuchuang.coder-sunshine.top/images/20250612144054.png)
+
+报错了 说明 `activeSub` 没值，处理下收集依赖的时候，`activeSub` 没值就不收集
+
+```ts
+export function track(target, key) {
+  if (!activeSub) {
+    return
+  }
+  // ...
+}
+```
+
+![20250612144233](https://tuchuang.coder-sunshine.top/images/20250612144233.png)
+
+这样就实现了一个最简单的 `reactive` 了。接下来处理一些细节上的问题
