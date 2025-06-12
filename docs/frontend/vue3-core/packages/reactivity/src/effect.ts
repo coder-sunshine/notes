@@ -18,6 +18,12 @@ class ReactiveEffect {
    */
   depsTail?: Link
 
+  /**
+   * 是否正在触发，startTrack 的时候设置为 true, endTrack 的时候设置为 false
+   * 触发更新的时候，根据 tracking 判断是否需要执行 effect
+   */
+  tracking = false
+
   constructor(public fn) {}
 
   run() {

@@ -16,6 +16,9 @@ export interface Subscriber {
   deps?: Link
   // 依赖项链表的尾节点
   depsTail?: Link
+
+  // 是否在收集依赖，在收集依赖的时候，不触发 effect 执行
+  tracking: boolean
 }
 
 /**
@@ -129,7 +132,12 @@ export function propagate(subs: Link) {
   let queuedEffect = []
 
   while (link) {
-    queuedEffect.push(link.sub)
+    const sub = link.sub
+    // 如果sub正在收集依赖，则不触发effect执行
+    if (!sub.tracking) {
+      queuedEffect.push(sub)
+    }
+
     link = link.nextSub
   }
 
@@ -138,18 +146,20 @@ export function propagate(subs: Link) {
 }
 
 /**
- * 开始追踪依赖，将depsTail，尾节点设置成 undefined
+ * 开始追踪依赖，将tracking设置为true，将depsTail，尾节点设置成 undefined
  * @param sub
  */
 export function startTrack(sub: Subscriber) {
+  sub.tracking = true
   sub.depsTail = undefined
 }
 
 /**
- * 结束追踪，找到需要清理的依赖，断开关联关系
+ * 结束追踪，将tracking设置为false，找到需要清理的依赖，断开关联关系
  * @param sub
  */
 export function endTrack(sub: Subscriber) {
+  sub.tracking = false
   const depsTail = sub.depsTail
 
   /**

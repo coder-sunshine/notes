@@ -1548,3 +1548,114 @@ export function link(dep: Dependency, sub: Subscriber) {
 ```
 
 创建的时候看 `linkPool` 是否有值， 有值则复用 `linkPool`。
+
+### 处理无限递归调用问题
+
+```js
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+effect(() => {
+  console.log(count.value++)
+})
+```
+
+![20250612095830](https://tuchuang.coder-sunshine.top/images/20250612095830.png)
+
+直接栈溢出了，因为 `effect` 里面在修改 `count` 的值，又会触发更新，又修改，更新，死循环了。
+
+**可以给 `effect` 加一个 标记，标识当前 `effect` 是否正在收集依赖，如果在收集依赖，那就不触发 `effect` 执行。**
+
+- effect.ts
+
+```ts{14-18}
+class ReactiveEffect {
+  // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
+
+  /**
+   * 依赖项链表的头节点
+   */
+  deps?: Link
+
+  /**
+   * 依赖项链表的尾节点
+   */
+  depsTail?: Link
+
+  /**
+   * 是否正在触发，startTrack 的时候设置为 true, endTrack 的时候设置为 false
+   * 触发更新的时候，根据 tracking 判断是否需要执行 effect
+   */
+  tracking = false
+
+  constructor(public fn) {}
+  // ...
+}
+```
+
+- system.ts
+
+```ts
+/**
+ * 订阅者
+ */
+export interface Subscriber {
+  // 依赖项链表的头节点
+  deps?: Link
+  // 依赖项链表的尾节点
+  depsTail?: Link
+
+  // 是否在收集依赖，在收集依赖的时候，不触发 effect 执行
+  tracking: boolean // [!code ++]
+}
+
+/**
+ * 开始追踪依赖，将tracking设置为true，将depsTail，尾节点设置成 undefined
+ * @param sub
+ */
+export function startTrack(sub: Subscriber) {
+  sub.tracking = true
+  sub.depsTail = undefined
+}
+
+/**
+ * 结束追踪，将tracking设置为false，找到需要清理的依赖，断开关联关系
+ * @param sub
+ */
+export function endTrack(sub: Subscriber) {
+  sub.tracking = false
+  // ...
+}
+```
+
+然后再传播更新的时候判断是否需要执行
+
+```ts
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    queuedEffect.push(link.sub) // [!code --]
+
+    const sub = link.sub // [!code ++]
+    // 如果sub正在收集依赖，则不触发effect执行
+    if (!sub.tracking) { // [!code ++]
+      // [!code ++]
+      queuedEffect.push(sub) // [!code ++]
+    } // [!code ++]
+
+    link = link.nextSub
+  }
+
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.notify())
+}
+```
