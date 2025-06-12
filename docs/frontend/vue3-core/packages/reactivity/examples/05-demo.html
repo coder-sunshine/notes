@@ -21,21 +21,23 @@
       const flag = ref(true)
       const name = ref('sunshine')
       const age = ref(18)
+      const test1 = ref('test1')
+      const test2 = ref('test2')
 
-      let count = 0
+      // let count = 0
 
       effect(() => {
         console.count('effect')
 
-        if (count > 0) {
-          return
-        }
-        count++
+        // if (count > 0) {
+        //   return
+        // }
+        // count++
         // 需要根据 flag 的值， 来决定 effect 的依赖项是什么，把不需要的依赖给清理掉
         if (flag.value) {
           app.innerHTML = name.value
         } else {
-          app.innerHTML = age.value
+          app.innerHTML = age.value + test1.value + test2.value
         }
       })
 
@@ -51,6 +53,8 @@
       ageBtn.onclick = () => {
         // 如果 flag 为 true，那么 age 就是依赖项，如果 flag 为 false，那么 age 就不是依赖项，需要清理掉
         age.value++
+        test1.value = test1.value + age.value
+        test2.value = test2.value + age.value
       }
     </script>
   </body>

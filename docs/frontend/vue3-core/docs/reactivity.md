@@ -1369,3 +1369,182 @@ function clearTracking(link: Link) {
 > 性能优化：避免不必要的更新计算
 >
 > 确保正确性：保证响应式系统的依赖关系准确性
+
+### linkPool 链表节点复用
+
+```js
+import { ref, effect } from '../dist/reactivity.esm.js'
+
+const flag = ref(true)
+const name = ref('sunshine')
+const age = ref(18)
+
+// let count = 0
+
+effect(() => {
+  console.count('effect')
+
+  // if (count > 0) {
+  //   return
+  // }
+  // count++
+  // 需要根据 flag 的值， 来决定 effect 的依赖项是什么，把不需要的依赖给清理掉
+  if (flag.value) {
+    app.innerHTML = name.value
+  } else {
+    app.innerHTML = age.value
+  }
+})
+
+flagBtn.onclick = () => {
+  flag.value = !flag.value
+}
+
+nameBtn.onclick = () => {
+  // 如果 flag 为 true，那么 name 就是依赖项，如果 flag 为 false，那么 name 就不是依赖项，需要清理掉
+  name.value = name.value + Math.random()
+}
+
+ageBtn.onclick = () => {
+  // 如果 flag 为 true，那么 age 就是依赖项，如果 flag 为 false，那么 age 就不是依赖项，需要清理掉
+  age.value++
+}
+```
+
+可以看到当 flag 一直切换时，会不停的清理依赖和创建新的节点，可以把清理后的依赖给保存下来，创建的时候就不创建新的了，直接用之前保存的。
+
+- ststem.ts
+
+```ts
+/**
+ * 清理依赖关系
+ * @param link
+ */
+function clearTracking(link: Link) {
+  // 清理依赖
+  while (link) {
+    const { dep, nextDep, nextSub, prevSub } = link
+
+    // 如果当前 link 的 prevSub 有值，则代表不是头节点，则把上一个的 nextSub 指向 link 的 nextSub
+    if (prevSub) {
+      // 把上一个的 nextSub 指向 link 的 nextSub
+      prevSub.nextSub = nextSub
+      // 把 link 的 nextSub 断开
+      link.nextSub = undefined
+    } else {
+      // prevSub 没值，则代表是头节点，则把头结点指向 nextSub
+      dep.subs = nextSub
+    }
+
+    // 如果下一个有，那就把 nextSub 的上一个节点，指向当前节点的上一个节点
+    if (nextSub) {
+      nextSub.prevSub = prevSub
+      // 断开 link 的 prevSub
+      link.prevSub = undefined
+    } else {
+      // 如果下一个没有，那它就是尾节点，把 dep.depsTail 指向上一个节点
+      dep.subsTail = prevSub
+    }
+
+    // 最后断开 link 的 dep sub 以及 nextDep
+    link.dep = link.sub = undefined
+
+    // 把 link.nextDep 指向linkPool，不写这个的话 有多个依赖，while循环的时候 等于 linkPool 永远就只有 link 节点一个了, 如果要复用多个就不行了
+    link.nextDep = undefined // [!code --]
+    link.nextDep = linkPool // [!code ++]
+
+    // linkPool 保存 被清理掉的 link
+    linkPool = link // [!code ++]
+
+    link = nextDep
+  }
+}
+```
+
+在清理依赖的时候将需要被清理的依赖保存到 `linkPool` 中
+
+```ts{25-55}
+/**
+ * 建立dep和sub的关联
+ * @param dep
+ * @param sub
+ */
+export function link(dep: Dependency, sub: Subscriber) {
+  // 尝试复用节点
+  const currentDep = sub.depsTail // 拿到当前的尾结点
+  /**
+   * 分两种情况：
+   * 1. 如果头节点有，尾节点没有，那么尝试着复用头节点
+   * 2. 如果尾节点还有 nextDep，尝试复用尾节点的 nextDep
+   */
+
+  // nextDep 为尝试复用的节点，如果尾节点为 undefined，那么就取头结点复用。
+  // 如果尾节点有值，说明是多个节点，那么就取尾结点的下一个节点复用
+  const nextDep = currentDep === undefined ? sub.deps : currentDep.nextDep
+
+  // nextDep 没值，代表 头结点都没，需要新建节点
+  if (nextDep && nextDep.dep === dep) {
+    sub.depsTail = nextDep
+    return
+  }
+
+  // 创建节点之前，看看能不能复用上 linkPool
+  let newLink: Link = undefined
+
+  if (linkPool) {
+    // 复用 linkPool
+    newLink = linkPool
+    // 把linkPool设置为linkPool中的下一个依赖
+    linkPool = linkPool.nextDep
+    // nextDep 等于没有复用掉的 dep
+    newLink.nextDep = nextDep
+    newLink.sub = sub
+    newLink.dep = dep
+  } else {
+    // 如果没有，就创建新的
+    newLink = {
+      sub,
+      dep,
+      nextDep,
+      nextSub: undefined,
+      prevSub: undefined,
+    }
+  }
+
+  // // 创建一个节点
+  // const newLink: Link = {
+  //   sub,
+  //   dep, // link 关联的 响应式数据
+  //   nextDep, // 将没复用上的节点作为新节点的 nextDep
+  //   nextSub: undefined,
+  //   prevSub: undefined,
+  // }
+
+  // 如果尾结点有，说明头结点肯定有
+  if (dep.subsTail) {
+    // 把新节点加到尾结点
+    dep.subsTail.nextSub = newLink
+    // 把新节点 prevSub 指向原来的尾巴
+    newLink.prevSub = dep.subsTail
+    // 更新尾结点
+    dep.subsTail = newLink
+  } else {
+    dep.subs = dep.subsTail = newLink
+  }
+
+  /**
+   * 将链表节点和 sub 建立对应关系
+   * 关联链表关系，分两种情况
+   * 1. 尾节点有，那就往尾节点后面加
+   * 2. 如果尾节点没有，则表示第一次关联，那就往头节点加，头尾相同
+   */
+  if (sub.depsTail) {
+    sub.depsTail.nextDep = newLink
+    sub.depsTail = newLink
+  } else {
+    sub.deps = sub.depsTail = newLink
+  }
+}
+```
+
+创建的时候看 `linkPool` 是否有值， 有值则复用 `linkPool`。

@@ -34,6 +34,8 @@ export interface Link {
   nextDep?: Link
 }
 
+let linkPool: Link | undefined
+
 /**
  * 建立dep和sub的关联
  * @param dep
@@ -58,14 +60,37 @@ export function link(dep: Dependency, sub: Subscriber) {
     return
   }
 
-  // 创建一个节点
-  const newLink: Link = {
-    sub,
-    dep, // link 关联的 响应式数据
-    nextDep, // 将没复用上的节点作为新节点的 nextDep
-    nextSub: undefined,
-    prevSub: undefined,
+  // 创建节点之前，看看能不能复用上 linkPool
+  let newLink: Link = undefined
+
+  if (linkPool) {
+    // 复用 linkPool
+    newLink = linkPool
+    // 把linkPool设置为linkPool中的下一个依赖
+    linkPool = linkPool.nextDep
+    // nextDep 等于没有复用掉的 dep
+    newLink.nextDep = nextDep
+    newLink.sub = sub
+    newLink.dep = dep
+  } else {
+    // 如果没有，就创建新的
+    newLink = {
+      sub,
+      dep,
+      nextDep,
+      nextSub: undefined,
+      prevSub: undefined,
+    }
   }
+
+  // // 创建一个节点
+  // const newLink: Link = {
+  //   sub,
+  //   dep, // link 关联的 响应式数据
+  //   nextDep, // 将没复用上的节点作为新节点的 nextDep
+  //   nextSub: undefined,
+  //   prevSub: undefined,
+  // }
 
   // 如果尾结点有，说明头结点肯定有
   if (dep.subsTail) {
@@ -178,7 +203,12 @@ function clearTracking(link: Link) {
 
     // 最后断开 link 的 dep sub 以及 nextDep
     link.dep = link.sub = undefined
-    link.nextDep = undefined
+
+    // 把 link.nextDep 指向linkPool，不写这个的话 有多个依赖，while循环的时候 等于 linkPool 永远就只有 link 节点一个了, 如果要复用多个就不行了
+    link.nextDep = linkPool
+
+    // linkPool 保存 被清理掉的 link
+    linkPool = link
 
     link = nextDep
   }
