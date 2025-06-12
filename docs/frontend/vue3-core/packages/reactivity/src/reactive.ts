@@ -28,17 +28,17 @@ export function createReactiveObject(target) {
 
   // 创建代理对象
   const proxy = new Proxy(target, {
-    get(target, key) {
+    get(target, key, receiver) {
       /**
        * 收集依赖
        * 绑定 target 中的某一个 key 和 sub 之间的关系
        */
       track(target, key)
 
-      return Reflect.get(target, key)
+      return Reflect.get(target, key, receiver)
     },
-    set(target, key, value) {
-      const res = Reflect.set(target, key, value)
+    set(target, key, value, receiver) {
+      const res = Reflect.set(target, key, value, receiver)
 
       /**
        * 触发更新， 设置值的时候，通知收集的依赖，重新执行
@@ -84,7 +84,6 @@ export function track(target, key) {
 
   // 绑定 dep 和 sub 的关系
   link(dep, activeSub)
-  console.log('targetMap ==> ', targetMap)
 }
 
 export function trigger(target, key) {

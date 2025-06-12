@@ -1874,3 +1874,138 @@ export function track(target, key) {
 ![20250612144233](https://tuchuang.coder-sunshine.top/images/20250612144233.png)
 
 这样就实现了一个最简单的 `reactive` 了。接下来处理一些细节上的问题
+
+### reactive 细节处理
+
+#### 处理 this 指向问题
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 0,
+  b: 1,
+  get sum() {
+    console.log(this)
+    return this.a + this.b
+  },
+})
+
+effect(() => {
+  console.log(state.sum)
+})
+
+setTimeout(() => {
+  state.a++
+}, 1000)
+```
+
+![20250612145054](https://tuchuang.coder-sunshine.top/images/20250612145054.png)
+
+可以看到当定时器执行后，`effect` 并没有重新执行。可以从下面的例子来思考
+
+```js
+const obj = {
+  a: 1,
+  b: 2,
+  get sum() {
+    console.log('this', this)
+    return this.a + this.b
+  },
+}
+
+const proxy = new Proxy(obj, {
+  get(target, key, receiver) {
+    // 打印 key 发现 只打印了 sum，并没有打印 a 和 b，说明 a 和 b 没有被 get 拦截到
+    console.log('key', key)
+    return target[key]
+  },
+  set(target, key, value, receiver) {
+    target[key] = value
+  },
+})
+
+console.log(proxy.sum)
+```
+
+![20250612145520](https://tuchuang.coder-sunshine.top/images/20250612145520.png)
+
+- 可以看到执行结果如下
+- key sum
+- this { a: 1, b: 2, sum: [Getter] } 这里的 this 是 obj， **因为 obj 并不是代理对象，所以 a 和 b 不会被 get 拦截到，我们需要做的就是把 this 指向代理对象**
+- 3
+
+> [!Tip] Reflect -> 完成对象的基本操作
+> 可以使用 `Reflect` 搭配 `receiver` 来处理 this 指向问题
+
+```js
+const obj1 = {
+  a: 1,
+  b: 2,
+  get sum() {
+    console.log('this', this)
+    return this.a + this.b
+  },
+}
+
+const proxy1 = new Proxy(obj1, {
+  get(target, key, receiver) {
+    console.log('receiver', receiver === proxy1)
+    console.log('key', key)
+    return Reflect.get(target, key, receiver)
+  },
+  set(target, key, value, receiver) {
+    return Reflect.set(target, key, value, receiver)
+  },
+})
+
+console.log(proxy1.sum)
+```
+
+![20250612152553](https://tuchuang.coder-sunshine.top/images/20250612152553.png)
+
+可以从执行结果中发现，此时的 `a` 和 `b` 已经被 `get` 给拦截到了，可以联想到 `vue` 源码中，当拦截到后就可以进行依赖收集了，后面再出发更新操作。这里的 `receiver` 和代理对象是相等的。
+
+```ts{14,21,23-24}
+/**
+ * 创建响应式对象
+ * @param target 目标对象
+ * @returns 返回代理对象
+ */
+export function createReactiveObject(target) {
+  // 如果不是对象，直接返回
+  if (!isObject(target)) {
+    return target
+  }
+
+  // 创建代理对象
+  const proxy = new Proxy(target, {
+    get(target, key, receiver) {
+      /**
+       * 收集依赖
+       * 绑定 target 中的某一个 key 和 sub 之间的关系
+       */
+      track(target, key)
+
+      return Reflect.get(target, key, receiver)
+    },
+    set(target, key, value, receiver) {
+      const res = Reflect.set(target, key, value, receiver)
+
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+
+      return res
+    },
+  })
+
+  return proxy
+}
+```
+
+在 get 和 set 中添加上 receiver 参数就可以了
+
+![20250612153031](https://tuchuang.coder-sunshine.top/images/20250612153031.png)
