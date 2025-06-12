@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   ref,
+      //   effect,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+      import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+      const obj = reactive({
+        a: 0,
+        b: 1,
+        c: 2,
+      })
+
+      const state1 = reactive(obj)
+      const state2 = reactive(obj)
+
+      console.log(state1 === state2)
+
+      effect(() => {
+        console.log(obj.a)
+      })
+
+      setTimeout(() => {
+        obj.a++
+      }, 1000)
+    </script>
+  </body>
+</html>

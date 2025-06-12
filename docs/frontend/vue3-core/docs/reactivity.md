@@ -2009,3 +2009,94 @@ export function createReactiveObject(target) {
 在 get 和 set 中添加上 receiver 参数就可以了
 
 ![20250612153031](https://tuchuang.coder-sunshine.top/images/20250612153031.png)
+
+#### 处理重复代理 target 的问题
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const obj = reactive({
+  a: 0,
+  b: 1,
+  c: 2,
+})
+
+const state1 = reactive(obj)
+const state2 = reactive(obj)
+
+console.log(state1 === state2)
+
+effect(() => {
+  console.log(obj.a)
+})
+
+setTimeout(() => {
+  obj.a++
+}, 1000)
+```
+
+![20250612153610](https://tuchuang.coder-sunshine.top/images/20250612153610.png)
+
+可以看到 state1 并不等于 state2，可以再创建 reactive 的时候，使用 weakMap 保存起来，然后在后面创建的时候判断是否存在，存在直接复用，不存在新建。
+
+```ts{1-5,18-22,48-52}
+/**
+ * 保存 target 和 响应式对象之间的关联关系
+ * target => proxy
+ */
+const reactiveMap = new WeakMap()
+
+/**
+ * 创建响应式对象
+ * @param target 目标对象
+ * @returns 返回代理对象
+ */
+export function createReactiveObject(target) {
+  // 如果不是对象，直接返回
+  if (!isObject(target)) {
+    return target
+  }
+
+  // 如果存在，直接复用
+  const existingProxy = reactiveMap.get(target)
+  if (existingProxy) {
+    return existingProxy
+  }
+
+  // 创建代理对象
+  const proxy = new Proxy(target, {
+    get(target, key, receiver) {
+      /**
+       * 收集依赖
+       * 绑定 target 中的某一个 key 和 sub 之间的关系
+       */
+      track(target, key)
+
+      return Reflect.get(target, key, receiver)
+    },
+    set(target, key, value, receiver) {
+      const res = Reflect.set(target, key, value, receiver)
+
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+
+      return res
+    },
+  })
+
+  /**
+   * 保存 target 和 proxy 之间的关联关系
+   * target => proxy , 如果再次创建 target 的代理对象，就可以复用了
+   */
+  reactiveMap.set(target, proxy)
+
+  return proxy
+}
+```
+
+这样就可以直接复用了
+
+![20250612153951](https://tuchuang.coder-sunshine.top/images/20250612153951.png)
