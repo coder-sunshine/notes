@@ -42,6 +42,13 @@ const mutableHandlers = {
       return res.value
     }
 
+    /**
+     * 如果 res 是一个对象，那就包装成 reactive
+     */
+    if (isObject(res)) {
+      return reactive(res)
+    }
+
     return res
   },
   set(target, key, newValue, receiver) {

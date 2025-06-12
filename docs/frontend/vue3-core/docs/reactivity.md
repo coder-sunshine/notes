@@ -2566,3 +2566,69 @@ export function endTrack(sub: Subscriber) {
 ```
 
 ![20250612222712](https://tuchuang.coder-sunshine.top/images/20250612222712.png)
+
+#### reactive 深层代理问题
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: {
+    b: 0,
+  },
+})
+
+effect(() => {
+  console.log(state.a.b)
+})
+
+setTimeout(() => {
+  state.a.b = 1
+}, 1000)
+```
+
+![20250612223204](https://tuchuang.coder-sunshine.top/images/20250612223204.png)
+
+这个问题很好处理，因为现在只代理了 `target`，也就是只代理了整个对象，也就是 `state.a`此时还是一个普通对象，自然修改了就不会触发 `effect`
+
+```js
+effect(() => {
+  console.log(state)
+  console.log(state.a)
+  console.log(state.a.b)
+})
+```
+
+![20250612223441](https://tuchuang.coder-sunshine.top/images/20250612223441.png)
+
+只需要在收集依赖的时候判断下，是否是对象，是就再用 reactive 包裹返回就行了
+
+```ts{16-21}
+const mutableHandlers = {
+  get(target, key, receiver) {
+    /**
+     * 收集依赖
+     * 绑定 target 中的某一个 key 和 sub 之间的关系
+     */
+    track(target, key)
+
+    const res = Reflect.get(target, key, receiver)
+
+    // ref 对象，需要返回 value
+    if (isRef(res)) {
+      return res.value
+    }
+
+    /**
+     * 如果 res 是一个对象，那就包装成 reactive
+     */
+    if (isObject(res)) {
+      return reactive(res)
+    }
+
+    return res
+  },
+}
+```
+
+![20250612223642](https://tuchuang.coder-sunshine.top/images/20250612223642.png)
