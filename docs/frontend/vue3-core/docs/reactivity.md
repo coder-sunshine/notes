@@ -2100,3 +2100,63 @@ export function createReactiveObject(target) {
 这样就可以直接复用了
 
 ![20250612153951](https://tuchuang.coder-sunshine.top/images/20250612153951.png)
+
+#### 处理代理复用的问题
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const obj = reactive({
+  a: 0,
+  b: 1,
+  c: 2,
+})
+
+const state1 = reactive(obj)
+const state2 = reactive(state1)
+
+console.log(state1 === state2)
+
+effect(() => {
+  console.log(obj.a)
+})
+
+setTimeout(() => {
+  obj.a++
+}, 1000)
+```
+
+![20250612154731](https://tuchuang.coder-sunshine.top/images/20250612154731.png)
+
+可以看到当把 `state1` 作为 `reactive` 参数传入的时候，`state1 !== state2` 了，这种情况下，需要直接复用之前的代理对象才行。
+
+创建一个 reactiveSet，创建一个 reactive 就保存一个，创建之前尝试复用
+
+```ts
+/**
+ * 保存所有使用 reactive 创建出来的响应式对象
+ */
+const reactiveSet = new WeakSet()
+
+/**
+ * 创建响应式对象
+ * @param target 目标对象
+ * @returns 返回代理对象
+ */
+export function createReactiveObject(target) {
+  // ...
+  // 如果已经创建过了，代表传入的就是一个 reactive 对象，则直接复用
+  if (reactiveSet.has(target)) {
+    return target
+  }
+
+  // ...
+
+  // 保存响应式对象到 reactiveSet
+  reactiveSet.add(proxy)
+
+  // ...
+}
+```
+
+![20250612155815](https://tuchuang.coder-sunshine.top/images/20250612155815.png)

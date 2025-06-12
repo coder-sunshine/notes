@@ -22,6 +22,11 @@ export function reactive(target: object) {
 const reactiveMap = new WeakMap()
 
 /**
+ * 保存所有使用 reactive 创建出来的响应式对象
+ */
+const reactiveSet = new WeakSet()
+
+/**
  * 创建响应式对象
  * @param target 目标对象
  * @returns 返回代理对象
@@ -29,6 +34,11 @@ const reactiveMap = new WeakMap()
 export function createReactiveObject(target) {
   // 如果不是对象，直接返回
   if (!isObject(target)) {
+    return target
+  }
+
+  // 如果已经创建过了，代表传入的就是一个 reactive 对象，则直接复用
+  if (reactiveSet.has(target)) {
     return target
   }
 
@@ -67,6 +77,9 @@ export function createReactiveObject(target) {
    * target => proxy , 如果再次创建 target 的代理对象，就可以复用了
    */
   reactiveMap.set(target, proxy)
+
+  // 保存响应式对象到 reactiveSet
+  reactiveSet.add(proxy)
 
   return proxy
 }
