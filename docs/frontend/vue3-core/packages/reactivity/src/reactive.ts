@@ -1,4 +1,4 @@
-import { isObject } from '@vue/shared'
+import { hasChanged, isObject } from '@vue/shared'
 import { link, Link, propagate } from './system'
 import { activeSub } from './effect'
 
@@ -26,6 +26,35 @@ const reactiveMap = new WeakMap()
  */
 const reactiveSet = new WeakSet()
 
+const mutableHandlers = {
+  get(target, key, receiver) {
+    /**
+     * 收集依赖
+     * 绑定 target 中的某一个 key 和 sub 之间的关系
+     */
+    track(target, key)
+
+    return Reflect.get(target, key, receiver)
+  },
+  set(target, key, newValue, receiver) {
+    // 拿到旧值
+    const oldValue = target[key]
+
+    // 这句代码执行之后，target[key] 的值就变成了 newValue， 顺序不能写反
+    const res = Reflect.set(target, key, newValue, receiver)
+
+    if (hasChanged(oldValue, newValue)) {
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+    }
+
+    return res
+  },
+}
+
 /**
  * 创建响应式对象
  * @param target 目标对象
@@ -49,28 +78,7 @@ export function createReactiveObject(target) {
   }
 
   // 创建代理对象
-  const proxy = new Proxy(target, {
-    get(target, key, receiver) {
-      /**
-       * 收集依赖
-       * 绑定 target 中的某一个 key 和 sub 之间的关系
-       */
-      track(target, key)
-
-      return Reflect.get(target, key, receiver)
-    },
-    set(target, key, value, receiver) {
-      const res = Reflect.set(target, key, value, receiver)
-
-      /**
-       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
-       * 先 set 然后再通知
-       */
-      trigger(target, key)
-
-      return res
-    },
-  })
+  const proxy = new Proxy(target, mutableHandlers)
 
   /**
    * 保存 target 和 proxy 之间的关联关系

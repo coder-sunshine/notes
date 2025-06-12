@@ -1920,8 +1920,8 @@ const proxy = new Proxy(obj, {
     console.log('key', key)
     return target[key]
   },
-  set(target, key, value, receiver) {
-    target[key] = value
+  set(target, key, newValue, receiver) {
+    target[key] = newValue
   },
 })
 
@@ -1954,8 +1954,8 @@ const proxy1 = new Proxy(obj1, {
     console.log('key', key)
     return Reflect.get(target, key, receiver)
   },
-  set(target, key, value, receiver) {
-    return Reflect.set(target, key, value, receiver)
+  set(target, key, newValue, receiver) {
+    return Reflect.set(target, key, newValue, receiver)
   },
 })
 
@@ -1989,8 +1989,8 @@ export function createReactiveObject(target) {
 
       return Reflect.get(target, key, receiver)
     },
-    set(target, key, value, receiver) {
-      const res = Reflect.set(target, key, value, receiver)
+    set(target, key, newValue, receiver) {
+      const res = Reflect.set(target, key, newValue, receiver)
 
       /**
        * 触发更新， 设置值的时候，通知收集的依赖，重新执行
@@ -2006,7 +2006,7 @@ export function createReactiveObject(target) {
 }
 ```
 
-在 get 和 set 中添加上 receiver 参数就可以了
+在 `get` 和 `set` 中添加上 `receiver` 参数就可以了
 
 ![20250612153031](https://tuchuang.coder-sunshine.top/images/20250612153031.png)
 
@@ -2074,8 +2074,8 @@ export function createReactiveObject(target) {
 
       return Reflect.get(target, key, receiver)
     },
-    set(target, key, value, receiver) {
-      const res = Reflect.set(target, key, value, receiver)
+    set(target, key, newValue, receiver) {
+      const res = Reflect.set(target, key, newValue, receiver)
 
       /**
        * 触发更新， 设置值的时候，通知收集的依赖，重新执行
@@ -2160,3 +2160,103 @@ export function createReactiveObject(target) {
 ```
 
 ![20250612155815](https://tuchuang.coder-sunshine.top/images/20250612155815.png)
+
+抽离 `mutableHandlers`, 不然每次创建 `reactive` 都会创建这个对象，
+
+```ts
+const mutableHandlers = {
+  get(target, key, receiver) {
+    /**
+     * 收集依赖
+     * 绑定 target 中的某一个 key 和 sub 之间的关系
+     */
+    track(target, key)
+
+    return Reflect.get(target, key, receiver)
+  },
+  set(target, key, newValue, receiver) {
+    const res = Reflect.set(target, key, newValue, receiver)
+
+    /**
+     * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+     * 先 set 然后再通知
+     */
+    trigger(target, key)
+
+    return res
+  },
+}
+
+export function createReactiveObject(target) {
+  // ...
+
+  // 创建代理对象
+  const proxy = new Proxy(target, mutableHandlers)
+
+  // ...
+}
+```
+
+#### 处理相同值更新的问题
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const obj = reactive({
+  a: 0,
+  b: 1,
+  c: 2,
+})
+
+const state1 = reactive(obj)
+const state2 = reactive(state1)
+
+console.log(state1 === state2)
+
+effect(() => {
+  console.log(obj.a)
+})
+
+setTimeout(() => {
+  obj.a = 0
+}, 1000)
+```
+
+![20250612160630](https://tuchuang.coder-sunshine.top/images/20250612160630.png)
+
+可以看到 `obj.a = 0`，也会触发 `effect` 重新执行。
+
+- shared/src/general.ts
+
+```ts
+export const hasChanged = (value: any, oldValue: any): boolean => !Object.is(value, oldValue)
+```
+
+- reactive.ts
+
+```ts{4-16}
+const mutableHandlers = {
+  // ...
+  set(target, key, newValue, receiver) {
+    // 拿到旧值
+    const oldValue = target[key]
+
+    // 这句代码执行之后，target[key] 的值就变成了 newValue， 顺序不能写反
+    const res = Reflect.set(target, key, newValue, receiver)
+
+    if (hasChanged(oldValue, newValue)) {
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+    }
+
+    return res
+  },
+}
+```
+
+![20250612161339](https://tuchuang.coder-sunshine.top/images/20250612161339.png)
+
+这样就只有 `变化了` 才会 `trigger` 了
