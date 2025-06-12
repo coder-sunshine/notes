@@ -2632,3 +2632,8 @@ const mutableHandlers = {
 ```
 
 ![20250612223642](https://tuchuang.coder-sunshine.top/images/20250612223642.png)
+
+将之前代码处理下:
+
+- 将关于 `mutableHandlers` 从 `reactive.ts` 抽离到 `baseHandler.ts`
+- 将关于 tract 和 trigger 方法相关从 `reactive.ts` 抽离到 `dep.ts`
