@@ -19,6 +19,9 @@ export interface Subscriber {
 
   // 是否在收集依赖，在收集依赖的时候，不触发 effect 执行
   tracking: boolean
+
+  // 处理 effect 收集相同依赖的问题
+  dirty: boolean
 }
 
 /**
@@ -134,7 +137,10 @@ export function propagate(subs: Link) {
   while (link) {
     const sub = link.sub
     // 如果sub正在收集依赖，则不触发effect执行
-    if (!sub.tracking) {
+    // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
+    if (!sub.tracking && !sub.dirty) {
+      // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      sub.dirty = true
       queuedEffect.push(sub)
     }
 
@@ -161,6 +167,9 @@ export function startTrack(sub: Subscriber) {
 export function endTrack(sub: Subscriber) {
   sub.tracking = false
   const depsTail = sub.depsTail
+
+  // 追踪完了，不脏了
+  sub.dirty = false
 
   /**
    * depsTail 有，并且 depsTail 还有 nextDep ，就把它们的依赖关系清理掉

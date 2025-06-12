@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      // import {
+      //   ref,
+      //   effect,
+      //   reactive,
+      // } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+      import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+      const count = ref(0)
+
+      const state = reactive({
+        a: 1,
+        b: 2,
+        count,
+      })
+
+      effect(() => {
+        console.log('state.count', state.count)
+        console.log('count.value', count.value)
+        // console.log('state.a', state.a)
+      })
+
+      setTimeout(() => {
+        state.count = 10
+        // state.count = ref(100)
+      }, 1000)
+    </script>
+  </body>
+</html>

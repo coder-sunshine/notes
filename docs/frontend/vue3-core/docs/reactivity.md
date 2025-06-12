@@ -2335,3 +2335,234 @@ export class RefImpl<T = any> {
 ```
 
 这样无论那种写法都可以触发更新了。
+
+#### reactive 嵌套 ref
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const state = reactive({
+  a: 1,
+  b: 2,
+  count,
+})
+
+effect(() => {
+  console.log('state.count', state.count)
+  console.log('count.value', count.value)
+})
+
+setTimeout(() => {
+  state.count = 10
+}, 1000)
+```
+
+![20250612210705](https://tuchuang.coder-sunshine.top/images/20250612210705.png)
+
+当 `reactive` 嵌套 `ref` 的时候，需要自动脱 Ref，
+
+- reactive.ts
+
+```ts
+const mutableHandlers = {
+  get(target, key, receiver) {
+    /**
+     * 收集依赖
+     * 绑定 target 中的某一个 key 和 sub 之间的关系
+     */
+    track(target, key)
+
+    const res = Reflect.get(target, key, receiver)
+
+    // ref 对象，需要返回 value
+    if (isRef(res)) {
+      return res.value
+    }
+
+    return res
+  },
+}
+```
+
+![20250612210727](https://tuchuang.coder-sunshine.top/images/20250612210727.png)
+
+可以看到虽然 `state.count` 改变了，但是原来的 `ref` 数据还没改变，这里分为以下两种情况
+
+- 原数据是 `ref` ，修改后不是 `ref` 数据，那么就需要同步原来的 `ref` 数据的修改
+- 如果原数据是 `ref`, 修改的值也是 `ref` 数据，那么就不需要同步原来的数据了。
+
+```ts{11-16,18-19}
+const mutableHandlers = {
+  set(target, key, newValue, receiver) {
+    // 拿到旧值
+    const oldValue = target[key]
+
+    /**
+     * 如果更新了 state.count 它之前是个 ref，那么会修改原始的 ref.value 的值 等于 newValue
+     * 如果 newValue 是一个 ref，那就不修改
+     */
+
+    if (isRef(oldValue) && !isRef(newValue)) {
+      // 这里修改了 ref 的值，是会触发 ref 的 set的，直接走 ref 的更新逻辑就行，直接返回 true,
+      // Reflect.set 放后面执行
+      oldValue.value = newValue
+      return true
+    }
+
+    // 这句代码执行之后，target[key] 的值就变成了 newValue， 顺序不能写反
+    const res = Reflect.set(target, key, newValue, receiver)
+
+    if (hasChanged(oldValue, newValue)) {
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+    }
+
+    return res
+  },
+}
+```
+
+**这里需要注意将 `Reflect.set` 放到 `ref` 判断后面执行，也就是 `ref` 直接走 `ref` 的逻辑就行了。**
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const state = reactive({
+  a: 1,
+  b: 2,
+  count,
+})
+
+effect(() => {
+  console.log('state.count', state.count)
+  console.log('count.value', count.value)
+})
+
+setTimeout(() => {
+  state.count = 10
+  // state.count = ref(100)
+}, 1000)
+```
+
+![20250612212321](https://tuchuang.coder-sunshine.top/images/20250612212321.png)
+
+![20250612212337](https://tuchuang.coder-sunshine.top/images/20250612212337.png)
+
+可以看到数值变化是正常的，这里第一种情况 effect 多执行了一次，是因为 effect 和 count 建立了多次关系，如果是下面这样就是正常的。
+
+#### effect 收集相同依赖问题
+
+```js
+const count = ref(0)
+
+const state = reactive({
+  a: 1,
+  b: 2,
+  count,
+})
+
+effect(() => {
+  console.log('state.count', state.count)
+  // console.log('count.value', count.value)
+  console.log('state.a', state.a)
+})
+
+setTimeout(() => {
+  state.count = 10
+  // state.count = ref(100)
+}, 1000)
+```
+
+![20250612215127](https://tuchuang.coder-sunshine.top/images/20250612215127.png)
+
+调整会原来的
+
+```js
+effect(() => {
+  console.log('state.count', state.count)
+  console.log('count.value', count.value)
+  // console.log('state.a', state.a)
+})
+
+/**
+ * 通知dep关联的sub重新执行
+ * @param dep
+ */
+export function triggerRef(dep: Dependency) {
+  console.log(dep)
+  dep.subs && propagate(dep.subs)
+}
+```
+
+打印 dep 看看，可以看到 dep 结构如下
+![20250612215235](https://tuchuang.coder-sunshine.top/images/20250612215235.png)
+
+- 源码里面在这里的处理是使用时间换空间
+  就是每次建立关联关系之前都循环判断，看当前 `dep` 有没有和 `effect` 建立过关系
+
+- 这里使用空间换时间的办法, 给 `effect` 添加一个 `dirty` 属性，默认为 `false`,在 `propagate` 中判断，如果不为脏，咋代表没执行过，可以添加到 队列中，如果为脏就不进入队列了。
+
+- effect.ts
+
+```ts
+class ReactiveEffect {
+  // ...
+  // 处理 effect 收集相同依赖的问题
+  dirty = false
+  // ...
+}
+```
+
+- system.ts
+
+```ts{15-19,36-37}
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    const sub = link.sub
+    // 如果sub正在收集依赖，则不触发effect执行
+    // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
+    if (!sub.tracking && !sub.dirty) {
+      // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      sub.dirty = true
+      queuedEffect.push(sub)
+    }
+
+    link = link.nextSub
+  }
+
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.notify())
+}
+
+/**
+ * 结束追踪，将tracking设置为false，找到需要清理的依赖，断开关联关系
+ * @param sub
+ */
+export function endTrack(sub: Subscriber) {
+  sub.tracking = false
+  const depsTail = sub.depsTail
+
+  // 追踪完了，不脏了
+  sub.dirty = false
+
+  // ...
+}
+```
+
+![20250612222712](https://tuchuang.coder-sunshine.top/images/20250612222712.png)

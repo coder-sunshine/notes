@@ -24,6 +24,9 @@ class ReactiveEffect {
    */
   tracking = false
 
+  // 处理 effect 收集相同依赖的问题
+  dirty = false
+
   constructor(public fn) {}
 
   run() {

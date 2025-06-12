@@ -1,6 +1,7 @@
 import { hasChanged, isObject } from '@vue/shared'
 import { link, Link, propagate } from './system'
 import { activeSub } from './effect'
+import { isRef } from './ref'
 
 class Dep {
   // 订阅者链表的头节点
@@ -34,11 +35,30 @@ const mutableHandlers = {
      */
     track(target, key)
 
-    return Reflect.get(target, key, receiver)
+    const res = Reflect.get(target, key, receiver)
+
+    // ref 对象，需要返回 value
+    if (isRef(res)) {
+      return res.value
+    }
+
+    return res
   },
   set(target, key, newValue, receiver) {
     // 拿到旧值
     const oldValue = target[key]
+
+    /**
+     * 如果更新了 state.count 它之前是个 ref，那么会修改原始的 ref.value 的值 等于 newValue
+     * 如果 newValue 是一个 ref，那就不修改
+     */
+
+    if (isRef(oldValue) && !isRef(newValue)) {
+      // 这里修改了 ref 的值，是会触发 ref 的 set的，直接走 ref 的更新逻辑就行，直接返回 true,
+      // Reflect.set 放后面执行
+      oldValue.value = newValue
+      return true
+    }
 
     // 这句代码执行之后，target[key] 的值就变成了 newValue， 顺序不能写反
     const res = Reflect.set(target, key, newValue, receiver)
