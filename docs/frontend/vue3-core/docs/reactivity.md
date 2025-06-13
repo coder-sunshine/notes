@@ -2745,4 +2745,422 @@ setTimeout(() => {
 - 传 getter 和 setter
   ![20250613110329](https://tuchuang.coder-sunshine.top/images/20250613110329.png)
 
-这样就实现了一个简易的 `computed`，接下来处理计算属性作为 `Dep` 时候收集依赖处理
+这样就实现了一个简易的 `computed`，接下来处理计算属性作为 `Dep` 时候收集依赖处理。
+
+可以先画图理解
+
+- 创建 `count` 和 `c(computed)` 两个节点
+  ![20250613143623](https://tuchuang.coder-sunshine.top/images/20250613143623.png)
+
+- 当 `count` 更新后，`computed` 回调会作为 `sub` 被通知更新，所以 `link1` 的 `sub` 会指向 `c(computed)`，当 `computed` `回调执行，返回的值发生变化，effect` 中依赖的 `c` 就变化了，也就会触发 `effect` 重新执行，也就是 `c` 的 `sub` 会指向 `effect`
+
+![20250613144050](https://tuchuang.coder-sunshine.top/images/20250613144050.png)
+
+在原型上添加 一个 update 方法，
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  // ...
+  get value() {
+    this.update()
+    return this._value
+  }
+
+  update() {
+    this._value = this.fn()
+  }
+}
+```
+
+#### 作为 dep 实现
+
+作为 `dep` 需要和 `sub` 建立关联关系
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  // ...
+  get value() {
+    // 作为 dep 和 sub 建立关联关系
+    if (activeSub) {
+      link(this, activeSub)
+    }
+
+    console.log(this)
+
+    this.update()
+    return this._value
+  }
+
+  update() {
+    this._value = this.fn()
+  }
+}
+```
+
+![20250613145515](https://tuchuang.coder-sunshine.top/images/20250613145515.png)
+
+![20250613145644](https://tuchuang.coder-sunshine.top/images/20250613145644.png)
+
+#### 作为 sub 实现
+
+作为 sub 的话和 effect 逻辑差不多，复制之前的代码到 update 方法中。
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  get value() {
+    // 作为 dep 和 sub 建立关联关系
+    if (activeSub) {
+      link(this, activeSub)
+    }
+
+    this.update()
+    return this._value
+  }
+
+  // 作为订阅者sub的实现， fn 执行期间建立 sub 和 dep 的关联
+  update() {
+    // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
+    const prevSub = activeSub
+
+    // 将当前的 effect 保存到全局，以便于收集依赖
+    setActiveSub(this)
+
+    /**
+     * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
+     * 那么此时的 depsTail 指向 undefined，deps 指向 link1，这种情况下，可以视为它之前收集过依赖，(有头无尾巴，说明手动设置过了，不是新节点)
+     * 在重新执行的时候，需要尝试着去复用，那么复用谁呢？肯定是先复用第一个，然后依次往后(也就是按照顺序执行)
+     */
+
+    startTrack(this)
+
+    try {
+      // 把 fn 的执行结果赋值给 _value, fn 执行期间建立 sub 和 dep 的关联
+      this._value = this.fn()
+    } finally {
+      // 结束追踪，找到需要清理的依赖，断开关联关系
+      endTrack(this)
+
+      setActiveSub(prevSub)
+
+      console.log(this)
+    }
+  }
+}
+```
+
+这里还修改了 处理 `activeSub` 的方法
+
+- effect.ts
+
+```ts
+export function setActiveSub(sub) {
+  activeSub = sub
+}
+```
+
+![20250613152659](https://tuchuang.coder-sunshine.top/images/20250613152659.png)
+
+![20250613152738](https://tuchuang.coder-sunshine.top/images/20250613152738.png)
+
+可以看到 `count` 已经被作为 依赖添加上了，且 `sub` 就是 `computed` 中的回调函数。
+
+这里在 定时器 里面修改 `count` 的值后，会触发 `count` 关联的 `sub` 重新执行，也就是 `computed` 的回调，但是在 `propagate` 方法中，执行的时候，拿到的 `sub` 上，类型是 `ComputedRefImpl` 的原型上面 并没有 `notify` 方法，只有 `update` 方法，可以打个**断点**看看
+
+```ts{23-24}
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    const sub = link.sub
+    // 如果sub正在收集依赖，则不触发effect执行
+    // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
+    if (!sub.tracking && !sub.dirty) {
+      // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      sub.dirty = true
+      queuedEffect.push(sub)
+    }
+
+    link = link.nextSub
+  }
+  console.log('queuedEffect', queuedEffect)
+  debugger
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.notify())
+}
+```
+
+![20250613153628](https://tuchuang.coder-sunshine.top/images/20250613153628.png)
+
+![20250613153649](https://tuchuang.coder-sunshine.top/images/20250613153649.png)
+
+所以对于计算属性作为 sub 需要特殊处理。
+
+- system.ts
+
+```ts{1-6,25-30}
+function processComputedUpdate(computed) {
+  // 1. 调用 computed 的 update 方法更新值
+  // 2. 通知 subs 链表上面的 所有 sub 重新执行
+  computed.update()
+  propagate(computed.subs)
+}
+
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    const sub = link.sub
+    // 如果sub正在收集依赖，则不触发effect执行
+    // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
+    if (!sub.tracking && !sub.dirty) {
+      // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      sub.dirty = true
+      // 如果有 update 方法，则代表是 computed 的 sub, ComputedRefImpl 上实现了 update 方法
+      if ('update' in sub) {
+        processComputedUpdate(sub)
+      } else {
+        queuedEffect.push(sub)
+      }
+    }
+
+    link = link.nextSub
+  }
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.notify())
+}
+```
+
+![20250613154243](https://tuchuang.coder-sunshine.top/images/20250613154243.png)
+
+但是其实现在跟之前的实现是没什么本质区别的，因为现在就是 `count` 改变，那么通知关联 `count` 的 `sub（computed）` 重新执行，然后 执行 `update` 方法，改变了 `c` 的值，然后通知 关联 `c` 的 `sub` 重新执行。
+
+**也就是说还是走的正常的逻辑，但是我们知道计算属性是有缓存的。**
+
+```js
+import { ref, effect, reactive, computed } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const c = computed(() => {
+  console.log('computed 执行了')
+  return count.value + 1
+})
+// const c = computed({
+//   get() {
+//     return count.value + 1
+//   },
+//   set(newValue) {
+//     console.log(newValue)
+//     count.value = newValue
+//   },
+// })
+
+effect(() => {
+  console.log('effect', c.value)
+})
+
+setTimeout(() => {
+  count.value = 1
+}, 1000)
+
+// setTimeout(() => {
+//   c.value = 10
+// }, 2000)
+```
+
+![20250613155526](https://tuchuang.coder-sunshine.top/images/20250613155526.png)
+
+可以看到 `computed` 执行了 三次，正常应该执行两次才对
+
+- 初始化创建的时候执行一次,此时 `c` 为 1
+- `count.value` 修改后，会触发关联的 `sub` 执行，也就是 `computed` 执行，就是第二次。此时 c 为 2
+- `computed` 执行后，`c` 也就改变了，会触发 `effect` `重新执行，effect` 里面又读取了，`c.value`，在 `get` 方法里面 又调用了 `update` 拿到 `fn` 的返回值，导致第三次执行。(**第三次其实可以直接拿到第二次的结果就行了，不需要再重新去执行了**)
+
+> [!TIP] 引入 dirt 处理，也是计算属性核心机制
+> dirty 初始为脏 `true` ，需要重新计算，只有为 `true` 的时候才会执行 `update` 方法，更新完了过后就变成 `false`。
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  // ...
+  get value() {
+    if (this.dirty) {
+      this.update()
+      // 执行完后改为 false
+      this.dirty = false
+    }
+
+    // 作为 dep 和 sub 建立关联关系
+    if (activeSub) {
+      link(this, activeSub)
+    }
+
+    return this._value
+  }
+  // ...
+}
+```
+
+```js
+import { ref, effect, reactive, computed } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const c = computed(() => {
+  console.log('computed 执行了')
+  return count.value + 1
+})
+// const c = computed({
+//   get() {
+//     return count.value + 1
+//   },
+//   set(newValue) {
+//     console.log(newValue)
+//     count.value = newValue
+//   },
+// })
+
+console.log(c.value)
+console.log(c.value)
+console.log(c.value)
+console.log(c.value)
+console.log(c.value)
+console.log(c.value)
+
+effect(() => {
+  console.log('effect', c.value)
+})
+
+setTimeout(() => {
+  count.value = 1
+}, 1000)
+
+// setTimeout(() => {
+//   c.value = 10
+// }, 2000)
+```
+
+![20250613163650](https://tuchuang.coder-sunshine.top/images/20250613163650.png)
+
+可以看到 `computed` 执行是正常的。
+
+- 注释 `effect`，修改了 `count` 的值后，会发现还是打印了两次，但是现在 `computed` 作为 `dep` 并没有关联 任何 `sub`
+  ![20250613164246](https://tuchuang.coder-sunshine.top/images/20250613164246.png)
+
+- system.ts
+
+```ts
+function processComputedUpdate(computed) {
+  // 1. 调用 computed 的 update 方法更新值
+  // 2. 通知 subs 链表上面的 所有 sub 重新执行
+
+  // 计算属性没关联 sub 就算关联的dep变了，也不重新执行
+  if (computed.subs) {
+    computed.update()
+    propagate(computed.subs)
+  }
+}
+```
+
+![20250613165420](https://tuchuang.coder-sunshine.top/images/20250613165420.png)
+
+打开 effect。
+![20250613170609](https://tuchuang.coder-sunshine.top/images/20250613170609.png)
+
+会发现正常了，但其实这里还是有问题的，因为之前在处理 `effect` 收集相同依赖的时候在 `endTrack` 方法里面把 `sub.dirty` 设置为 `false` 了，可以先把这个代码注释掉，继续分析。
+
+![20250613170758](https://tuchuang.coder-sunshine.top/images/20250613170758.png)
+
+注释掉后发现 computed 执行了三次。说明 dirty 属性没有设置正确。
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  dirty = true
+
+  get value() {
+    if (this.dirty) {
+      this.update()
+      // 之前是这只在这里的，但是很多时候并不是通过 get 访问的，这里修改了 count，那么就是 通过 processComputedUpdate 方法去触发的 update。所以应该将这个代码移到 update fn执行完毕过后
+      this.dirty = false
+    }
+
+    // 作为 dep 和 sub 建立关联关系
+    if (activeSub) {
+      link(this, activeSub)
+    }
+
+    return this._value
+  }
+
+  update() {
+    // ...
+  }
+}
+```
+
+```ts
+update() {
+  try {
+      // 把 fn 的执行结果赋值给 _value, fn 执行期间建立 sub 和 dep 的关联
+      this._value = this.fn()
+      this.dirty = false // fn 执行完毕后设置
+    } finally {
+      // 结束追踪，找到需要清理的依赖，断开关联关系
+      endTrack(this)
+
+      setActiveSub(prevSub)
+    }
+}
+```
+
+并且在 sub 执行之前，也需要把 dirty 设置为 true,也是因为之前已经设置过了，所以就不需要设置了
+
+```ts{16-17}
+/**
+ * 传播更新
+ * @param subs
+ */
+export function propagate(subs: Link) {
+  let link = subs
+
+  // 创建一个 sub 的 队列，处理完后依次执行
+  let queuedEffect = []
+
+  while (link) {
+    const sub = link.sub
+    // 如果sub正在收集依赖，则不触发effect执行
+    // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
+    if (!sub.tracking && !sub.dirty) {
+      // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      sub.dirty = true
+      // 如果有 update 方法，则代表是 computed 的 sub, ComputedRefImpl 上实现了 update 方法
+      if ('update' in sub) {
+        processComputedUpdate(sub)
+      } else {
+        queuedEffect.push(sub)
+      }
+    }
+
+    link = link.nextSub
+  }
+  // 拿到所有的sub执行
+  queuedEffect.forEach(effect => effect.notify())
+}
+```
+
+既然 update 中 fn 执行完了过后需要将 dirty 设置为 false，那么也可以放到 endTrack 里面去 和 effect 一起处理。
+
+![20250613171925](https://tuchuang.coder-sunshine.top/images/20250613171925.png)

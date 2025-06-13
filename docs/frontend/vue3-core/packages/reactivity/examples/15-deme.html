@@ -19,6 +19,7 @@
       const count = ref(0)
 
       const c = computed(() => {
+        console.log('computed 执行了')
         return count.value + 1
       })
       // const c = computed({
@@ -30,6 +31,13 @@
       //     count.value = newValue
       //   },
       // })
+
+      console.log(c.value)
+      console.log(c.value)
+      console.log(c.value)
+      console.log(c.value)
+      console.log(c.value)
+      console.log(c.value)
 
       effect(() => {
         console.log('effect', c.value)

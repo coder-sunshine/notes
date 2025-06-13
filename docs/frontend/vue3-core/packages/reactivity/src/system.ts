@@ -124,6 +124,17 @@ export function link(dep: Dependency, sub: Subscriber) {
   }
 }
 
+function processComputedUpdate(computed) {
+  // 1. 调用 computed 的 update 方法更新值
+  // 2. 通知 subs 链表上面的 所有 sub 重新执行
+
+  // 计算属性没关联 sub 就算关联的dep变了，也不重新执行
+  if (computed.subs) {
+    computed.update()
+    propagate(computed.subs)
+  }
+}
+
 /**
  * 传播更新
  * @param subs
@@ -140,13 +151,18 @@ export function propagate(subs: Link) {
     // 不是脏的 effect，才能进入，因为脏的 effect 已经执行过了
     if (!sub.tracking && !sub.dirty) {
       // 一进来就设置为脏，当 effect 的 dep 是相同的时候，那么 sub 相同，那么 dirty 就是脏的，就不会重新执行了
+      // 无论是 computed 还是 effect 都需要将 dirty 设置为 true
       sub.dirty = true
-      queuedEffect.push(sub)
+      // 如果有 update 方法，则代表是 computed 的 sub, ComputedRefImpl 上实现了 update 方法
+      if ('update' in sub) {
+        processComputedUpdate(sub)
+      } else {
+        queuedEffect.push(sub)
+      }
     }
 
     link = link.nextSub
   }
-
   // 拿到所有的sub执行
   queuedEffect.forEach(effect => effect.notify())
 }

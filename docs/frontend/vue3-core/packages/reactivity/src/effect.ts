@@ -1,11 +1,14 @@
+import { endTrack, Link, startTrack, Subscriber } from './system'
+
 // 用来保存当前正在执行的 effect
-
-import { endTrack, Link, startTrack } from './system'
-
 // fn 调用，那么 fn 里面的依赖就会触发相应的 get set 操作等。就可以初步建立关联关系
 export let activeSub
 
-class ReactiveEffect {
+export function setActiveSub(sub) {
+  activeSub = sub
+}
+
+class ReactiveEffect implements Subscriber {
   // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
 
   /**
@@ -34,7 +37,7 @@ class ReactiveEffect {
     const prevSub = activeSub
 
     // 将当前的 effect 保存到全局，以便于收集依赖
-    activeSub = this
+    setActiveSub(this)
 
     /**
      * 当 effect 执行完毕后，会收集到依赖，可以这样，当 effect 被通知更新的时候，把 depsTail 设置成 undefined
@@ -50,7 +53,7 @@ class ReactiveEffect {
       // 结束追踪，找到需要清理的依赖，断开关联关系
       endTrack(this)
 
-      activeSub = prevSub
+      setActiveSub(prevSub)
     }
   }
 

@@ -4,7 +4,7 @@ import { activeSub } from './effect'
 import { Dependency, link, Link, propagate } from './system'
 import { reactive } from './reactive'
 
-export class RefImpl<T = any> {
+export class RefImpl<T = any> implements Dependency {
   _value: T
 
   // ref标记
