@@ -2636,4 +2636,113 @@ const mutableHandlers = {
 将之前代码处理下:
 
 - 将关于 `mutableHandlers` 从 `reactive.ts` 抽离到 `baseHandler.ts`
-- 将关于 tract 和 trigger 方法相关从 `reactive.ts` 抽离到 `dep.ts`
+- 将关于 `tract` 和 `trigger` 方法相关从 `reactive.ts` 抽离到 `dep.ts`
+
+### computed 实现
+
+> [!IMPORTANT] computed 双重身份
+>
+> 1. **作为依赖项（Dep）**：可以被其他响应式效果（如 `effect` ）订阅
+> 2. **作为订阅者（Sub）**：可以收集自身计算函数中访问的响应式数据
+
+这种双重身份的设计体现在 ComputedRefImpl 类的实现中：
+
+- computed.ts
+
+```ts
+import { isFunction } from '@vue/shared'
+import { ReactiveFlags } from './constants'
+import { Dependency, Link, Subscriber } from './system'
+
+class ComputedRefImpl implements Subscriber, Dependency {
+  // 计算属性也是一个 ref
+  [ReactiveFlags.IS_REF] = true
+
+  // 保存 fn 的返回值
+  _value
+
+  // 订阅者链表的头节点
+  subs: Link | undefined
+  // 订阅者链表的尾节点
+  subsTail: Link | undefined
+
+  // 依赖项链表的头节点
+  deps: Link | undefined
+  // 依赖项链表的尾节点
+  depsTail: Link | undefined
+
+  dirty = true // 脏属性，默认脏,因为初始化需要执行一次
+
+  constructor(
+    public fn, // getter
+    private setter // setter
+  ) {}
+
+  get value() {
+    console.log('读取了value')
+    return this.fn()
+  }
+
+  set value(newValue) {
+    if (this.setter) {
+      this.setter(newValue)
+    } else {
+      console.warn('我是只读的, 不能设置值')
+    }
+  }
+}
+
+export function computed(getterOrOptions) {
+  let getter, setter
+
+  // 只传一个函数就是 getter
+  if (isFunction(getterOrOptions)) {
+    getter = getterOrOptions
+  } else {
+    // 传对象就是 get 和 set
+    getter = getterOrOptions.get
+    setter = getterOrOptions.set
+  }
+
+  return new ComputedRefImpl(getter, setter)
+}
+```
+
+```js
+import { ref, effect, reactive, computed } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const c = computed(() => {
+  return count.value + 1
+})
+// const c = computed({
+//   get() {
+//     return count.value + 1
+//   },
+//   set(newValue) {
+//     console.log(newValue)
+//     count.value = newValue
+//   },
+// })
+
+effect(() => {
+  console.log('effect', c.value)
+})
+
+setTimeout(() => {
+  count.value = 1
+}, 1000)
+
+// setTimeout(() => {
+//   c.value = 10
+// }, 2000)
+```
+
+- 传函数，不传 setter
+  ![20250613110241](https://tuchuang.coder-sunshine.top/images/20250613110241.png)
+
+- 传 getter 和 setter
+  ![20250613110329](https://tuchuang.coder-sunshine.top/images/20250613110329.png)
+
+这样就实现了一个简易的 `computed`，接下来处理计算属性作为 `Dep` 时候收集依赖处理

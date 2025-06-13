@@ -18,7 +18,7 @@ export interface Subscriber {
   depsTail?: Link
 
   // 是否在收集依赖，在收集依赖的时候，不触发 effect 执行
-  tracking: boolean
+  tracking?: boolean
 
   // 处理 effect 收集相同依赖的问题
   dirty: boolean
