@@ -1,4 +1,4 @@
-import { isFunction } from '@vue/shared'
+import { hasChanged, isFunction } from '@vue/shared'
 import { ReactiveFlags } from './constants'
 import { Dependency, endTrack, link, Link, startTrack, Subscriber } from './system'
 import { activeSub, setActiveSub } from './effect'
@@ -65,8 +65,14 @@ class ComputedRefImpl implements Subscriber, Dependency {
     startTrack(this)
 
     try {
+      // 拿到旧值
+      const oldValue = this._value
+
       // 把 fn 的执行结果赋值给 _value, fn 执行期间建立 sub 和 dep 的关联
       this._value = this.fn()
+
+      // 返回是否相等，让调用者自行判断是否需要重新执行 sub
+      return hasChanged(oldValue, this._value)
     } finally {
       // 结束追踪，找到需要清理的依赖，断开关联关系
       endTrack(this)

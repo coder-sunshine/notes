@@ -129,8 +129,8 @@ function processComputedUpdate(computed) {
   // 2. 通知 subs 链表上面的 所有 sub 重新执行
 
   // 计算属性没关联 sub 就算关联的dep变了，也不重新执行
-  if (computed.subs) {
-    computed.update()
+  // 当 update 返回 true，说明值没变，不需要执行 sub
+  if (computed.subs && computed.update()) {
     propagate(computed.subs)
   }
 }

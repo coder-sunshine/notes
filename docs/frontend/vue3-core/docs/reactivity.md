@@ -3164,3 +3164,72 @@ export function propagate(subs: Link) {
 既然 update 中 fn 执行完了过后需要将 dirty 设置为 false，那么也可以放到 endTrack 里面去 和 effect 一起处理。
 
 ![20250613171925](https://tuchuang.coder-sunshine.top/images/20250613171925.png)
+
+#### 值相等处理
+
+```js
+import { ref, effect, reactive, computed } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const c = computed(() => {
+  console.log('computed 执行了')
+  // 永远返回 0
+  return count.value * 0
+})
+
+effect(() => {
+  console.log('effect', c.value)
+})
+
+setTimeout(() => {
+  count.value = 1
+}, 1000)
+```
+
+![20250613172228](https://tuchuang.coder-sunshine.top/images/20250613172228.png)
+
+**当这种情况的时候，也就是 `computed` 计算出来的值没有发生变化时,是不需要通知关联的 `sub` 重新执行的**
+
+很简单，只需要在 `fn` 执行完后 判断新值，老值 是否相等，不相等 在触发 `sub` 执行
+
+- computed.ts
+
+```ts
+class ComputedRefImpl implements Subscriber, Dependency {
+  update() {
+    try {
+      // 拿到旧值
+      const oldValue = this._value
+
+      // 把 fn 的执行结果赋值给 _value, fn 执行期间建立 sub 和 dep 的关联
+      this._value = this.fn()
+
+      // 返回是否相等，让调用者自行判断是否需要重新执行 sub
+      return hasChanged(oldValue, this._value)
+    } finally {
+      // 结束追踪，找到需要清理的依赖，断开关联关系
+      endTrack(this)
+
+      setActiveSub(prevSub)
+    }
+  }
+}
+```
+
+- system.ts
+
+```ts
+function processComputedUpdate(computed) {
+  // 1. 调用 computed 的 update 方法更新值
+  // 2. 通知 subs 链表上面的 所有 sub 重新执行
+
+  // 计算属性没关联 sub 就算关联的dep变了，也不重新执行
+  // 当 update 返回 true，说明值没变，不需要执行 sub
+  if (computed.subs && computed.update()) {
+    propagate(computed.subs)
+  }
+}
+```
+
+![20250613172856](https://tuchuang.coder-sunshine.top/images/20250613172856.png)
