@@ -2161,6 +2161,17 @@ export function createReactiveObject(target) {
 
 ![20250612155815](https://tuchuang.coder-sunshine.top/images/20250612155815.png)
 
+> [!IMPORTANT] 源码
+> 源码不是这样处理的，源码是去判断一些属性，然后返回的。
+
+- reactive.ts
+
+![20250613173149](https://tuchuang.coder-sunshine.top/images/20250613173149.png)
+
+- baseHandlers.ts
+
+![20250613173210](https://tuchuang.coder-sunshine.top/images/20250613173210.png)
+
 抽离 `mutableHandlers`, 不然每次创建 `reactive` 都会创建这个对象，
 
 ```ts
