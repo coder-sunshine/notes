@@ -2,7 +2,17 @@ import { ReactiveEffect } from './effect'
 import { isRef } from './ref'
 
 export function watch(source, cb, options) {
-  let { immediate } = options
+  let { immediate, once } = options
+
+  if (once) {
+    // 保存原来的 cb
+    const _cb = cb
+    // 重写 cb 函数，执行一次后，调用 stop 函数
+    cb = (...args) => {
+      _cb(...args)
+      stop()
+    }
+  }
 
   let getter: () => any
 

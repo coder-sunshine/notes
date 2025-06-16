@@ -3486,3 +3486,58 @@ export function watch(source, cb, options) {
 ```
 
 ![20250616160934](https://tuchuang.coder-sunshine.top/images/20250616160934.png)
+
+#### once
+
+once 代表只执行一次，实际上就是执行一次后，就调用 stop 函数就行了。
+
+```js
+// import { ref, effect, reactive, watch } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+watch(
+  count,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // immediate: true,
+    once: true,
+  }
+)
+
+setTimeout(() => {
+  count.value = 100
+
+  setTimeout(() => {
+    count.value = 1000
+  }, 3000)
+}, 1000)
+```
+
+![20250616163210](https://tuchuang.coder-sunshine.top/images/20250616163210.png)
+
+- watch.ts
+
+```ts
+export function watch(source, cb, options) {
+  let { immediate, once } = options
+
+  if (once) {
+    // 保存原来的 cb
+    const _cb = cb
+    // 重写 cb 函数，执行一次后，调用 stop 函数
+    cb = (...args) => {
+      _cb(...args)
+      stop()
+    }
+  }
+
+  // ...
+}
+```
+
+![20250616163324](https://tuchuang.coder-sunshine.top/images/20250616163324.png)
