@@ -3541,3 +3541,40 @@ export function watch(source, cb, options) {
 ```
 
 ![20250616163324](https://tuchuang.coder-sunshine.top/images/20250616163324.png)
+
+#### 深度监听
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const state = ref({
+  a: 0,
+  b: {
+    c: 2,
+  },
+})
+
+watch(
+  state,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // immediate: true,
+    // once: true,
+    deep: true,
+  }
+)
+
+setTimeout(() => {
+  state.value = {
+    a: 100,
+  }
+  // state.value.a = 100
+}, 1000)
+```
+
+![20250616164833](https://tuchuang.coder-sunshine.top/images/20250616164833.png)
+
+当没有设置 deep 的时候，只有给 state.value = xxx 这样赋值的时候才能触发 watch 回调执行，当传了 deep 为 true 的时候，就需要深度监听，也就是递归监听每一个数据

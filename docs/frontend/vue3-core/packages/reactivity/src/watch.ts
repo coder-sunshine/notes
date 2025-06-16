@@ -1,8 +1,9 @@
+import { isObject } from '@vue/shared'
 import { ReactiveEffect } from './effect'
 import { isRef } from './ref'
 
 export function watch(source, cb, options) {
-  let { immediate, once } = options
+  let { immediate, once, deep } = options
 
   if (once) {
     // 保存原来的 cb
@@ -19,6 +20,15 @@ export function watch(source, cb, options) {
   if (isRef(source)) {
     // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
     getter = () => source.value
+  }
+
+  // deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
+  if (deep) {
+    const baseGetter = getter
+
+    console.log(baseGetter());
+    
+    getter = () => traverse(baseGetter())
   }
 
   // 创建一个 effect， 接受处理好的 getter 函数
@@ -54,4 +64,18 @@ export function watch(source, cb, options) {
 
   // 返回一个 stop 方法，用于停止监听
   return stop
+}
+
+function traverse(value) {
+  // 如果 value 不是对象，则直接返回
+  if (!isObject(value)) {
+    return value
+  }
+
+  // 循环遍历 value 的属性，递归调用 traverse 方法
+  for (const key in value) {
+    traverse(value[key])
+  }
+
+  return value
 }
