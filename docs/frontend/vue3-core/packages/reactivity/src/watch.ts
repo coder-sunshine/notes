@@ -1,7 +1,9 @@
 import { ReactiveEffect } from './effect'
 import { isRef } from './ref'
 
-export function watch(source, cb) {
+export function watch(source, cb, options) {
+  let { immediate } = options
+
   let getter: () => any
 
   if (isRef(source)) {
@@ -12,8 +14,8 @@ export function watch(source, cb) {
   // 创建一个 effect， 接受处理好的 getter 函数
   const effect = new ReactiveEffect(getter)
 
-  // 执行 getter 函数，收集依赖
-  let oldValue = effect.run()
+  // 初始化为 undefined
+  let oldValue = undefined
 
   // 创建一个 scheduler 函数，用于在数据变化时执行
   const job = () => {
@@ -28,9 +30,18 @@ export function watch(source, cb) {
     oldValue = newValue
   }
 
+  if (immediate) {
+    // 这个时候 oldValue 是 undefined
+    job()
+  } else {
+    oldValue = effect.run()
+  }
+
   // 覆盖 effect 原型上面的 scheduler 方法，在数据变化时执行 job 函数
   effect.scheduler = job
 
+  const stop = () => effect.stop()
+
   // 返回一个 stop 方法，用于停止监听
-  return () => effect.stop()
+  return stop
 }

@@ -3407,3 +3407,82 @@ export class ReactiveEffect implements Subscriber {
 ![20250616154730](https://tuchuang.coder-sunshine.top/images/20250616154730.png)
 
 调用了 stop 后，后面修改 count 的值就不会触发了
+
+#### immediate
+
+watch 第三个参数可以传入 immediate，控制是否立即执行
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+watch(
+  count,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    immediate: true,
+  }
+)
+
+setTimeout(() => {
+  count.value = 100
+}, 1000)
+```
+
+- watch.ts
+
+```ts
+import { ReactiveEffect } from './effect'
+import { isRef } from './ref'
+
+export function watch(source, cb, options) {
+  let { immediate } = options
+
+  let getter: () => any
+
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  }
+
+  // 创建一个 effect， 接受处理好的 getter 函数
+  const effect = new ReactiveEffect(getter)
+
+  // 初始化为 undefined
+  let oldValue = undefined
+
+  // 创建一个 scheduler 函数，用于在数据变化时执行
+  const job = () => {
+    // 把新值老值传给 cb 函数,这里需要重新执行 run方法收集依赖。而不是用 getter 函数执行拿到结果
+    // 因为有可能会出现分支切换等情况，需要重新收集依赖
+    const newValue = effect.run()
+
+    // 执行回调函数
+    cb(newValue, oldValue)
+
+    // 更新老值
+    oldValue = newValue
+  }
+
+  if (immediate) {
+    // 这个时候 oldValue 是 undefined
+    job()
+  } else {
+    oldValue = effect.run()
+  }
+
+  // 覆盖 effect 原型上面的 scheduler 方法，在数据变化时执行 job 函数
+  effect.scheduler = job
+
+  const stop = () => effect.stop()
+
+  // 返回一个 stop 方法，用于停止监听
+  return stop
+}
+```
+
+![20250616160934](https://tuchuang.coder-sunshine.top/images/20250616160934.png)
