@@ -3244,3 +3244,107 @@ function processComputedUpdate(computed) {
 ```
 
 ![20250613172856](https://tuchuang.coder-sunshine.top/images/20250613172856.png)
+
+### watch 实现
+
+**计算属性允许我们声明性地计算衍生值。然而在有些情况下，我们需要在状态变化时执行一些“副作用”：例如更改 DOM，或是根据异步操作的结果去修改另一处的状态。**
+
+> [!TIP] 原理
+> 监听器本质上就是一个 `effect`, 给 `effect` 上面挂载一个 `scheduler`，覆盖 `effect` 原型上面的 `scheduler`，然后当数据变化后，执行 `notify` 方法会调用用户传入的覆盖后的 `scheduler`。
+>
+> 根据不同的数据源，来构造 `getter` 函数, 然后创建一个 `scheduler` 函数覆盖原型上面的 `scheduler`，首先执行一遍 `getter` 函数，也就是 `effect.run` 收集依赖，并且拿到 `oldValue`，执行 `scheduler` 函数的时候，需要再次执行 `run` 方法重新收集依赖并且拿到新值，然后把 `oldValue` 和 `newValue`，传给 `cb` 函数，更新老值就行了。
+
+#### 侦听数据源类型
+
+`watch` 的第一个参数可以是不同形式的“数据源”：它可以是一个 **ref** (包括计算属性)、**一个响应式对象**、**一个 getter 函数**、或**多个数据源组成的数组**：
+
+> [!WARNING] 注意
+> **不能直接侦听响应式对象的属性值**，例如下面的例子是没有任何打印值的
+>
+> 这样直接监听一个普通对象是监听不到的，除非写成 getter 函数形式
+
+```js
+import { ref, effect, reactive, watch } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+
+const state = reactive({
+  a: 1,
+  b: 2,
+  c: {
+    d: 3,
+  },
+})
+
+watch([state.a, state.c], (newVal, oldVal) => {
+  console.log('老值 ==>', oldVal)
+  console.log('新值 ==>', newVal)
+})
+
+setTimeout(() => {
+  state.a = 100
+  state.c = 1000
+}, 1000)
+```
+
+上面的例子 无任何 输出
+
+#### watch初实现
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+watch(count, (newVal, oldVal) => {
+  console.log('老值 ==>', oldVal)
+  console.log('新值 ==>', newVal)
+})
+
+setTimeout(() => {
+  count.value = 1
+}, 1000)
+```
+
+- watch.ts
+
+```ts
+import { ReactiveEffect } from './effect'
+import { isRef } from './ref'
+
+export function watch(source, cb) {
+  let getter: () => any
+
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  }
+
+  // 创建一个 effect， 接受处理好的 getter 函数
+  const effect = new ReactiveEffect(getter)
+
+  // 执行 getter 函数，收集依赖
+  let oldValue = effect.run()
+
+  // 创建一个 scheduler 函数，用于在数据变化时执行
+  const job = () => {
+    // 把新值老值传给 cb 函数,这里需要重新执行 run方法收集依赖。而不是用 getter 函数执行拿到结果
+    // 因为有可能会出现分支切换等情况，需要重新收集依赖
+    const newValue = effect.run()
+
+    // 执行回调函数
+    cb(newValue, oldValue)
+
+    // 更新老值
+    oldValue = newValue
+  }
+
+  // 覆盖 effect 原型上面的 scheduler 方法，在数据变化时执行 job 函数
+  effect.scheduler = job
+
+  // 返回一个 stop 方法，用于停止监听
+  return () => {
+    console.log('停止监听')
+  }
+}
+```
+
+![20250616151130](https://tuchuang.coder-sunshine.top/images/20250616151130.png)

@@ -8,7 +8,7 @@ export function setActiveSub(sub) {
   activeSub = sub
 }
 
-class ReactiveEffect implements Subscriber {
+export class ReactiveEffect implements Subscriber {
   // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
 
   /**
