@@ -9,6 +9,9 @@ export function setActiveSub(sub) {
 }
 
 export class ReactiveEffect implements Subscriber {
+  // 表示这个 effect 是否被激活
+  active = true
+
   // 加一个单向链表（依赖项链表），在重新执行时可以找到自己之前收集到的依赖，尝试复用：
 
   /**
@@ -33,6 +36,11 @@ export class ReactiveEffect implements Subscriber {
   constructor(public fn) {}
 
   run() {
+    // 如果 effect 不是激活状态，那么直接返回 fn 执行结果
+    if (!this.active) {
+      return this.fn()
+    }
+
     // fn 执行之前，保存上一次的 activeSub，也就是保存外层的 activeSub，这样内层执行完毕，恢复外层的 activeSub，继续执行，就不会有问题了
     const prevSub = activeSub
 
@@ -70,6 +78,20 @@ export class ReactiveEffect implements Subscriber {
    */
   scheduler() {
     this.run()
+  }
+
+  stop() {
+    // 激活状态，清理依赖，设置为非激活状态
+    if (this.active) {
+      // 清理依赖，直接调用之前的开始追踪和结束追踪
+      startTrack(this)
+      endTrack(this)
+
+      this.active = false
+    }
+
+    // 设置为非激活状态
+    this.active = false
   }
 }
 

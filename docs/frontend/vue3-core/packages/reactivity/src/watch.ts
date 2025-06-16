@@ -32,7 +32,5 @@ export function watch(source, cb) {
   effect.scheduler = job
 
   // 返回一个 stop 方法，用于停止监听
-  return () => {
-    console.log('停止监听')
-  }
+  return () => effect.stop()
 }

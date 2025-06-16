@@ -14,27 +14,15 @@
 
       const count = ref(0)
 
-      const state = reactive({
-        a: 1,
-        b: 2,
-        c: {
-          d: 3,
-        },
+      const stop = watch(count, (newVal, oldVal) => {
+        console.log('老值 ==>', oldVal)
+        console.log('新值 ==>', newVal)
       })
 
-      watch(
-        count,
-        (newVal, oldVal) => {
-          console.log('老值 ==>', oldVal)
-          console.log('新值 ==>', newVal)
-        }
-      )
-
       setTimeout(() => {
-        // state.a = 100
-        // state.c = 1000
-
         count.value = 100
+        stop()
+        count.value = 200
       }, 1000)
     </script>
   </body>

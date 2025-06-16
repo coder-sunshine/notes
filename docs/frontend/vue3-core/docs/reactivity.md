@@ -3348,3 +3348,62 @@ export function watch(source, cb) {
 ```
 
 ![20250616151130](https://tuchuang.coder-sunshine.top/images/20250616151130.png)
+
+#### stop 方法
+
+`watch` 函数返回一个 `stop` 函数，调用 `stop` 会将 `watch` 设置为 非激活状态，后续更新就不会执行 `watch` 回调了。
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const count = ref(0)
+
+const stop = watch(count, (newVal, oldVal) => {
+  console.log('老值 ==>', oldVal)
+  console.log('新值 ==>', newVal)
+})
+
+setTimeout(() => {
+  count.value = 100
+  stop()
+  count.value = 200
+}, 1000)
+```
+
+- watch.ts
+
+```ts
+export function watch(source, cb) {
+  // ...
+
+  // 返回一个 stop 方法，用于停止监听
+  return () => effect.stop()
+}
+```
+
+- effect.ts
+
+```ts
+export class ReactiveEffect implements Subscriber {
+  // 表示这个 effect 是否被激活
+  active = true
+
+  stop() {
+    // 激活状态，清理依赖，设置为非激活状态
+    if (this.active) {
+      // 清理依赖，直接调用之前的开始追踪和结束追踪
+      startTrack(this)
+      endTrack(this)
+
+      this.active = false
+    }
+
+    // 设置为非激活状态
+    this.active = false
+  }
+}
+```
+
+![20250616154730](https://tuchuang.coder-sunshine.top/images/20250616154730.png)
+
+调用了 stop 后，后面修改 count 的值就不会触发了
