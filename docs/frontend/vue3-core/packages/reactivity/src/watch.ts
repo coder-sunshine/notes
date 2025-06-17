@@ -26,9 +26,8 @@ export function watch(source, cb, options) {
   if (deep) {
     const baseGetter = getter
 
-    console.log(baseGetter());
-    
-    getter = () => traverse(baseGetter())
+    const depth = deep === true ? Infinity : deep
+    getter = () => traverse(baseGetter(), depth)
   }
 
   // 创建一个 effect， 接受处理好的 getter 函数
@@ -66,15 +65,17 @@ export function watch(source, cb, options) {
   return stop
 }
 
-function traverse(value) {
-  // 如果 value 不是对象，则直接返回
-  if (!isObject(value)) {
+function traverse(value, depth = Infinity) {
+  // 如果不是对象，直接返回当前值
+  if (!isObject(value) || depth <= 0) {
     return value
   }
 
-  // 循环遍历 value 的属性，递归调用 traverse 方法
+  depth--
+
+  // 是对象，则循环遍历每个键
   for (const key in value) {
-    traverse(value[key])
+    traverse(value[key], depth)
   }
 
   return value

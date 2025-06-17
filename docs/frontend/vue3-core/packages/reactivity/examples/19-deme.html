@@ -15,7 +15,9 @@
       const state = ref({
         a: 0,
         b: {
-          c: 2,
+          c: {
+            d: 2,
+          },
         },
       })
 
@@ -28,7 +30,8 @@
         {
           // immediate: true,
           // once: true,
-          deep: true,
+          // deep: true,
+          deep: 3,
         }
       )
 
@@ -36,7 +39,8 @@
         // state.value = {
         //   a: 100,
         // }
-        state.value.a = 100
+        // state.value.a = 100
+        state.value.b.c.d = 1000
       }, 1000)
     </script>
   </body>

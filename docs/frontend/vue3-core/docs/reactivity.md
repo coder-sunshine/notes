@@ -3568,13 +3568,156 @@ watch(
 )
 
 setTimeout(() => {
+  // 可以检测到更改
   state.value = {
     a: 100,
   }
+  // 不能检测到更改
   // state.value.a = 100
 }, 1000)
 ```
 
 ![20250616164833](https://tuchuang.coder-sunshine.top/images/20250616164833.png)
 
-当没有设置 deep 的时候，只有给 state.value = xxx 这样赋值的时候才能触发 watch 回调执行，当传了 deep 为 true 的时候，就需要深度监听，也就是递归监听每一个数据
+当没有设置 `deep` 的时候，只有给 `state.value = xxx` 这样赋值的时候才能触发 `watch` 回调执行，当传了 `deep` 为 `true` 的时候，就需要深度监听，也就是递归监听每一个数据，给每一个数据都**访问一下**，也就是收集依赖了
+
+- watch.ts
+
+```ts{15-19,24-36}
+import { isObject } from '@vue/shared'
+import { ReactiveEffect } from './effect'
+import { isRef } from './ref'
+
+export function watch(source, cb, options) {
+  let { immediate, once, deep } = options
+
+  // ...
+
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  }
+
+  // deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
+  if (deep) {
+    const baseGetter = getter
+    getter = () => traverse(baseGetter())
+  }
+
+  // ...
+}
+
+function traverse(value) {
+  // 如果不是对象，直接返回当前值
+  if (!isObject(value)) {
+    return value
+  }
+
+  // 是对象，则循环遍历每个键
+  for (const key in value) {
+    traverse(value[key])
+  }
+
+  return value
+}
+```
+
+![20250617101927](https://tuchuang.coder-sunshine.top/images/20250617101927.png)
+
+这样改深层的也可以监听到变化了
+
+deep 不仅可以设置布尔值，也可以设置为一个数字，代表监听的层级。
+
+```js{22}
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const state = ref({
+  a: 0,
+  b: {
+    c: {
+      d: 2,
+    },
+  },
+})
+
+watch(
+  state,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // immediate: true,
+    // once: true,
+    // deep: true,
+    deep: 1,
+  }
+)
+
+setTimeout(() => {
+  // state.value = {
+  //   a: 100,
+  // }
+  // state.value.a = 100
+  state.value.b.c.d = 1000
+}, 1000)
+```
+
+![20250617105129](https://tuchuang.coder-sunshine.top/images/20250617105129.png)
+
+目前也是可以触发更新的，因为 deep 等于 1 也会判断为 true
+
+```ts{2}
+// deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
+if (deep) {
+  const baseGetter = getter
+  getter = () => traverse(baseGetter())
+}
+```
+
+**我们可以在递归的时候去判断，如果层级小于等于 0，就直接返回就行了，否则就让 层级 减少 1**
+
+```ts{17-18,24,26,30,34}
+export function watch(source, cb, options) {
+  let { immediate, once, deep } = options
+
+  // ...
+
+  let getter: () => any
+
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  }
+
+  // deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
+  if (deep) {
+    const baseGetter = getter
+
+    const depth = deep === true ? Infinity : deep
+    getter = () => traverse(baseGetter(), depth)
+  }
+
+  // ...
+}
+
+function traverse(value, depth = Infinity) {
+  // 如果不是对象，直接返回当前值
+  if (!isObject(value) || depth <= 0) {
+    return value
+  }
+
+  depth--
+
+  // 是对象，则循环遍历每个键
+  for (const key in value) {
+    traverse(value[key], depth)
+  }
+
+  return value
+}
+```
+
+这样就监听不到变化了，手动将 `deep` 改为 3, `state.value.b.c.d = 1000` 改为 3 后就可以监听到变化了
+
+![20250617145522](https://tuchuang.coder-sunshine.top/images/20250617145522.png)
