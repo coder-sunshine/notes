@@ -3721,3 +3721,69 @@ function traverse(value, depth = Infinity) {
 这样就监听不到变化了，手动将 `deep` 改为 3, `state.value.b.c.d = 1000` 改为 3 后就可以监听到变化了
 
 ![20250617145522](https://tuchuang.coder-sunshine.top/images/20250617145522.png)
+
+#### 循环引用
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const state = ref({
+  a: 0,
+  b: {
+    c: {
+      d: 2,
+    },
+  },
+})
+
+state.value.a = state
+
+watch(
+  state,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // immediate: true,
+    // once: true,
+    deep: true,
+    // deep: 3,
+  }
+)
+
+setTimeout(() => {
+  state.value.b.c.d = 1000
+}, 1000)
+```
+
+**`state.value.a = state`， 因为设置了 `deep = true`, 这里直接造成循环引用了，一直在递归，浏览器直接栈溢出。可以用一个 `set` 把访问过的保存起来，如果再遇到访问过的对象，直接返回就行了，就不要去递归这个已经访问过的对象了。**
+
+```ts{1,7-12,18}
+function traverse(value, depth = Infinity, seen = new Set()) {
+  // 如果不是对象，直接返回当前值
+  if (!isObject(value) || depth <= 0) {
+    return value
+  }
+
+  // 如果已经访问过了，直接返回就行了
+  if (seen.has(value)) {
+    return value
+  }
+
+  seen.add(value)
+
+  depth--
+
+  // 是对象，则循环遍历每个键
+  for (const key in value) {
+    traverse(value[key], depth, seen)
+  }
+
+  return value
+}
+```
+
+![20250617164712](https://tuchuang.coder-sunshine.top/images/20250617164712.png)
+
+这样就避免了循环引用的时候一直去递归的问题

@@ -65,17 +65,24 @@ export function watch(source, cb, options) {
   return stop
 }
 
-function traverse(value, depth = Infinity) {
+function traverse(value, depth = Infinity, seen = new Set()) {
   // 如果不是对象，直接返回当前值
   if (!isObject(value) || depth <= 0) {
     return value
   }
 
+  // 如果已经访问过了，直接返回就行了
+  if (seen.has(value)) {
+    return value
+  }
+
+  seen.add(value)
+
   depth--
 
   // 是对象，则循环遍历每个键
   for (const key in value) {
-    traverse(value[key], depth)
+    traverse(value[key], depth, seen)
   }
 
   return value

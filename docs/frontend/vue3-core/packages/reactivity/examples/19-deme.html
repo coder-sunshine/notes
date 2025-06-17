@@ -21,6 +21,8 @@
         },
       })
 
+      state.value.a = state
+
       watch(
         state,
         (newVal, oldVal) => {
@@ -30,8 +32,8 @@
         {
           // immediate: true,
           // once: true,
-          // deep: true,
-          deep: 3,
+          deep: true,
+          // deep: 3,
         }
       )
 
