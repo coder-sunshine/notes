@@ -52,3 +52,7 @@ export function createReactiveObject(target) {
 
   return proxy
 }
+
+export function isReactive(target) {
+  return reactiveSet.has(target)
+}

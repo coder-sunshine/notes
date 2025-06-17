@@ -3787,3 +3787,77 @@ function traverse(value, depth = Infinity, seen = new Set()) {
 ![20250617164712](https://tuchuang.coder-sunshine.top/images/20250617164712.png)
 
 这样就避免了循环引用的时候一直去递归的问题
+
+#### 监听 reactive
+
+**当监听的是 `reactive` 的时候，默认 `deep` 就是 `true`**
+
+```js
+import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 0,
+  b: {
+    c: {
+      d: 2,
+    },
+  },
+})
+
+watch(
+  state,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // reactive 默认 deep 为 true
+    deep: true,
+    // deep: 3,
+  }
+)
+
+setTimeout(() => {
+  state.b.c.d = 1000
+}, 1000)
+```
+
+![20250617171318](https://tuchuang.coder-sunshine.top/images/20250617171318.png)
+
+报错，因为还没处理 getter
+
+- reactive.ts
+
+reactiveSet 是保存的创建的 reactive 对象，可以这样判断
+
+```ts
+export function isReactive(target) {
+  return reactiveSet.has(target)
+}
+```
+
+- watch.ts
+
+```ts{11-18}
+import { isReactive } from './reactive'
+
+export function watch(source, cb, options) {
+  let { immediate, once, deep } = options
+
+  let getter: () => any
+
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  } else if (isReactive(source)) {
+    // 如果 source 是 reactive，则构造 getter 函数直接返回 source 就行了
+    getter = () => source
+    // deep默认为true
+    if (deep === undefined) {
+      deep = true
+    }
+  }
+}
+```
+
+这样就处理好了当 `source` 是 `reactive` 的情况

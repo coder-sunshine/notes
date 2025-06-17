@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import { ref, effect, reactive, watch } from '../../../node_modules/vue/dist/vue.esm-browser.prod.js'
+      // import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+      const state = reactive({
+        a: 0,
+        b: {
+          c: {
+            d: 2,
+          },
+        },
+      })
+
+      watch(
+        state,
+        (newVal, oldVal) => {
+          console.log('老值 ==>', oldVal)
+          console.log('新值 ==>', newVal)
+        },
+        {
+          // reactive 默认 deep 为 true
+          deep: false,
+          // deep: 3,
+        }
+      )
+
+      setTimeout(() => {
+        state.b.c.d = 1000
+      }, 1000)
+    </script>
+  </body>
+</html>

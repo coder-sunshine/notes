@@ -1,6 +1,7 @@
 import { isObject } from '@vue/shared'
 import { ReactiveEffect } from './effect'
 import { isRef } from './ref'
+import { isReactive } from './reactive'
 
 export function watch(source, cb, options) {
   let { immediate, once, deep } = options
@@ -20,6 +21,13 @@ export function watch(source, cb, options) {
   if (isRef(source)) {
     // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
     getter = () => source.value
+  } else if (isReactive(source)) {
+    // 如果 source 是 reactive，则构造 getter 函数直接返回 source 就行了
+    getter = () => source
+    // deep默认为true
+    if (deep === undefined) {
+      deep = true
+    }
   }
 
   // deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
