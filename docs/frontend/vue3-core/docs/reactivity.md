@@ -3861,3 +3861,59 @@ export function watch(source, cb, options) {
 ```
 
 这样就处理好了当 `source` 是 `reactive` 的情况
+
+#### 监听 getter 函数
+
+当 `source` 是一个 `getter` 函数的时候，直接把 `getter` 赋值成 `source` 就行了
+
+```js
+const state = reactive({
+  a: 0,
+  b: {
+    c: {
+      d: 2,
+    },
+  },
+})
+
+watch(
+  // state,
+  () => state,
+  (newVal, oldVal) => {
+    console.log('老值 ==>', oldVal)
+    console.log('新值 ==>', newVal)
+  },
+  {
+    // reactive 默认 deep 为 true
+    deep: true,
+    // deep: 3,
+  }
+)
+
+setTimeout(() => {
+  state.b.c.d = 1000
+}, 1000)
+```
+
+```ts{13-16}
+export function watch(source, cb, options) {
+  // ...
+  if (isRef(source)) {
+    // 如果 source 是 ref，则构造 getter 函数直接返回 source.value 就行了
+    getter = () => source.value
+  } else if (isReactive(source)) {
+    // 如果 source 是 reactive，则构造 getter 函数直接返回 source 就行了
+    getter = () => source
+    // deep默认为true
+    if (deep === undefined) {
+      deep = true
+    }
+  } else if (isFunction(source)) {
+    // 如果 source 是函数，那么直接赋值
+    getter = source
+  }
+  // ...
+}
+```
+
+![20250617175414](https://tuchuang.coder-sunshine.top/images/20250617175414.png)

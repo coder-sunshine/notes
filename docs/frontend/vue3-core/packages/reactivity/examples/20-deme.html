@@ -22,14 +22,15 @@
       })
 
       watch(
-        state,
+        // state,
+        () => state,
         (newVal, oldVal) => {
           console.log('老值 ==>', oldVal)
           console.log('新值 ==>', newVal)
         },
         {
           // reactive 默认 deep 为 true
-          deep: false,
+          deep: true,
           // deep: 3,
         }
       )

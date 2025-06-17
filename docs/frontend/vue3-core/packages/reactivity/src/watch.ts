@@ -1,4 +1,4 @@
-import { isObject } from '@vue/shared'
+import { isFunction, isObject } from '@vue/shared'
 import { ReactiveEffect } from './effect'
 import { isRef } from './ref'
 import { isReactive } from './reactive'
@@ -28,6 +28,9 @@ export function watch(source, cb, options) {
     if (deep === undefined) {
       deep = true
     }
+  } else if (isFunction(source)) {
+    // 如果 source 是函数，那么直接赋值
+    getter = source
   }
 
   // deep 传了就递归收集所有的依赖，只要访问一下，就会收集依赖了，
