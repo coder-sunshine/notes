@@ -28,6 +28,11 @@ export function watch(source, cb, options) {
     if (deep === undefined) {
       deep = true
     }
+
+    // deep 传了 false 或者 0  都设置为 1
+    if (deep === false || deep === 0) {
+      deep = 1
+    }
   } else if (isFunction(source)) {
     // 如果 source 是函数，那么直接赋值
     getter = source

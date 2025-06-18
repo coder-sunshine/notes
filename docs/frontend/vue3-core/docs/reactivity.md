@@ -3856,11 +3856,18 @@ export function watch(source, cb, options) {
     if (deep === undefined) {
       deep = true
     }
+    // deep 传了 false 或者 0  都设置为 1
+    if (deep === false || deep === 0) {
+      deep = 1
+    }
   }
 }
 ```
 
 这样就处理好了当 `source` 是 `reactive` 的情况
+
+源码部分逻辑
+![20250618111224](https://tuchuang.coder-sunshine.top/images/20250618111224.png)
 
 #### 监听 getter 函数
 
