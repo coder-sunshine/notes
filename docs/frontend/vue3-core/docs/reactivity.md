@@ -3924,3 +3924,116 @@ export function watch(source, cb, options) {
 ```
 
 ![20250617175414](https://tuchuang.coder-sunshine.top/images/20250617175414.png)
+
+#### onCleanup 副作用清理
+
+侦听器可以拿到一个 副作用清理函数，可以在这个函数里面清理做一些清理操作。
+![20250620162211](https://tuchuang.coder-sunshine.top/images/20250620162211.png)
+
+```html
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    body {
+      padding: 150px;
+    }
+    #app,
+    #dv {
+      width: 100px;
+      height: 100px;
+      background: red;
+      color: #fff;
+    }
+    #dv {
+      background: #000;
+    }
+  </style>
+  <body>
+    <div id="app">app</div>
+    <div id="dv">dv</div>
+    <button id="btn">按钮</button>
+
+    <script type="module">
+      import { ref, effect, reactive, computed, watch } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+      // import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+      const flag = ref(true)
+
+      btn.onclick = () => {
+        flag.value = !flag.value
+      }
+
+      watch(
+        flag,
+        (newVal, oldVal, onCleanup) => {
+          console.log('newVal ===> ', newVal)
+          console.log('oldVal ===> ', oldVal)
+
+          const dom = newVal ? app : dv
+          const handler = () => {
+            console.log(newVal ? '点击了 app' : '点击了 dv')
+          }
+          dom.addEventListener('click', handler)
+          onCleanup(() => {
+            console.log('清理函数onCleanup执行 ===> ')
+            dom.removeEventListener('click', handler)
+          })
+        },
+        { immediate: true }
+      )
+    </script>
+  </body>
+</html>
+```
+
+上面的代码是有个 `app` 块，`dv` 块，一个按钮用来切换 `flag` 的状态，初始化是给 `app` 绑定事件，点击切换状态按钮后，接执行 `onCleanup` 删除事件，然后给 `dv` 绑定事件，如此反复
+
+![20250620162740](https://tuchuang.coder-sunshine.top/images/20250620162740.png)
+
+点击 `app` 有反应，`dv` 没反应，点击按钮切换状态
+
+![20250620163609](https://tuchuang.coder-sunshine.top/images/20250620163609.png)
+
+切换后就是点 `app` 没反应，`dv` 有反应了
+
+要实现这个功能，可以在 watch 函数里面的 cb回调函数里面的参数中接受第三个参数 onCleanup，这是一个函数，这个函数接受一个 fn 作为回调函数，就可以把 fn 保存下来了，在 job 执行之前，判断这个函数有没有值，有值就先执行一遍，然后置空。
+
+- watch.ts
+
+```ts{2,4,6-9,13-17,24}
+export function watch(source, cb, options) {
+  let { immediate, once, deep } = options || {}
+  // ...
+  let cleanup = null
+
+  // 定义一个 onCleanup 函数作为 cb 的第三个参数传入进去，这样就可以拿到用户传入的回调函数
+  const onCleanup = fn => {
+    cleanup = fn
+  }
+
+  // 创建一个 scheduler 函数，用于在数据变化时执行
+  const job = () => {
+    // 第一次执行是 null, onCleanup 传入 cb 后 cleanup 就等于用户传入的回调，那么下一次执行的时候就有值了，就先清理副作用，然后置为 null
+    if (cleanup) {
+      cleanup()
+      cleanup = null
+    }
+
+    // 把新值老值传给 cb 函数,这里需要重新执行 run方法收集依赖。而不是用 getter 函数执行拿到结果
+    // 因为有可能会出现分支切换等情况，需要重新收集依赖
+    const newValue = effect.run()
+
+    // 执行回调函数
+    cb(newValue, oldValue, onCleanup)
+
+    // 更新老值
+    oldValue = newValue
+  }
+  // ...
+}
+```

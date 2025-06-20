@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <style>
+    body {
+      padding: 150px;
+    }
+    #app,
+    #dv {
+      width: 100px;
+      height: 100px;
+      background: red;
+      color: #fff;
+    }
+    #dv {
+      background: #000;
+    }
+  </style>
+  <body>
+    <div id="app">app</div>
+    <div id="dv">dv</div>
+    <button id="btn">按钮</button>
+
+    <script type="module">
+      // import { ref, effect, reactive, computed, watch } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+      import { ref, effect, reactive, computed, watch } from '../dist/reactivity.esm.js'
+
+      const flag = ref(true)
+
+      btn.onclick = () => {
+        flag.value = !flag.value
+      }
+
+      const stop = watch(
+        flag,
+        (newVal, oldVal, onCleanup) => {
+          console.log('newVal ===> ', newVal)
+          console.log('oldVal ===> ', oldVal)
+
+          const dom = newVal ? app : dv
+          const handler = () => {
+            console.log(newVal ? '点击了 app' : '点击了 dv')
+          }
+          dom.addEventListener('click', handler)
+          onCleanup(() => {
+            console.log('清理函数onCleanup执行 ===> ')
+            dom.removeEventListener('click', handler)
+          })
+        },
+        { immediate: true }
+      )
+
+    </script>
+  </body>
+</html>

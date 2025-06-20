@@ -4,7 +4,7 @@ import { isRef } from './ref'
 import { isReactive } from './reactive'
 
 export function watch(source, cb, options) {
-  let { immediate, once, deep } = options
+  let { immediate, once, deep } = options || {}
 
   if (once) {
     // 保存原来的 cb
@@ -52,14 +52,27 @@ export function watch(source, cb, options) {
   // 初始化为 undefined
   let oldValue = undefined
 
+  let cleanup = null
+
+  // 定义一个 onCleanup 函数作为 cb 的第三个参数传入进去，这样就可以拿到用户传入的回调函数
+  const onCleanup = fn => {
+    cleanup = fn
+  }
+
   // 创建一个 scheduler 函数，用于在数据变化时执行
   const job = () => {
+    // 第一次执行是 null, onCleanup 传入 cb 后 cleanup 就等于用户传入的回调，那么下一次执行的时候就有值了，就先清理副作用，然后置为 null
+    if (cleanup) {
+      cleanup()
+      cleanup = null
+    }
+
     // 把新值老值传给 cb 函数,这里需要重新执行 run方法收集依赖。而不是用 getter 函数执行拿到结果
     // 因为有可能会出现分支切换等情况，需要重新收集依赖
     const newValue = effect.run()
 
     // 执行回调函数
-    cb(newValue, oldValue)
+    cb(newValue, oldValue, onCleanup)
 
     // 更新老值
     oldValue = newValue
