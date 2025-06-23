@@ -4237,3 +4237,29 @@ export const mutableHandlers = {
 ```
 
 ![20250623112938](https://tuchuang.coder-sunshine.top/images/20250623112938.png)
+
+### 响应式：工具
+
+#### toRef
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 1,
+})
+
+const { a } = state
+
+effect(() => {
+  console.log(a)
+})
+
+setTimeout(() => {
+  state.a = 2
+}, 1000)
+```
+
+![20250623173922](https://tuchuang.coder-sunshine.top/images/20250623173922.png)
+
+当解构后，就失去响应式了，因为解构出来的 a 和 state.a 不是一个引用地址了

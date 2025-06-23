@@ -61,7 +61,6 @@ export const mutableHandlers = {
     const newLength = targetIsArray ? newValue.length : 0
     // key 不是 length ，并且是数组，并且老的 length 和新的 length 不一样
     // key 等于 length，就走上面的 hasChanged 逻辑
-    console.log('key', key)
     if (targetIsArray && oldLength !== newLength && key !== 'length') {
       console.log('隐式更新 length')
       trigger(target, 'length')
