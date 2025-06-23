@@ -44,6 +44,8 @@ export function track(target, key) {
 }
 
 export function trigger(target, key) {
+  console.log('trigger', target, key)
+
   const depsMap = targetMap.get(target)
   if (!depsMap) {
     return

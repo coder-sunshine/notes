@@ -4152,3 +4152,88 @@ export function trigger(target, key) {
 ```
 
 ![20250623101120](https://tuchuang.coder-sunshine.top/images/20250623101120.png)
+
+#### 隐式更新 length
+
+隐式更新 `length` 指的是 **间接的修改了数组的 `length`**，例如 `push`,`pop`,`shift`,`unshift` 方法。
+
+> [!TIP] 隐式更新 length
+> 更新前：length = 4 => ['a', 'b', 'c', 'd']
+>
+> 更新动作，以 `push` 为例，追加了一个 `e`
+>
+> 隐式更新 `length` 的方法：`push` `pop` `shift` `unshift`
+>
+> 如何知道 隐式更新了 `length`
+>
+> **在 `set` 的时候，可以拿到 `set` 前后的值，判断是否是数组，并且修改的不是 `length` 属性，并且前后 `length` 不一样就行了**
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const arr = ref(['a', 'b', 'c', 'd'])
+
+effect(() => {
+  // 隐式更新 push 等操作 也会触发 effect 重新执行
+  console.log('effect执行=>', arr.value)
+})
+
+setTimeout(() => {
+  arr.value.push('e')
+}, 1000)
+```
+
+![20250623112747](https://tuchuang.coder-sunshine.top/images/20250623112747.png)
+
+可以看到目前 effect 只是初始化执行了一次，push 后也应该执行。
+
+- baseHandler.ts
+
+```ts{6-8,33-40}
+export const mutableHandlers = {
+  set(target, key, newValue, receiver) {
+    // 拿到旧值
+    const oldValue = target[key]
+
+    // 拿到数组更新之前的 length
+    const targetIsArray = Array.isArray(target)
+    const oldLength = targetIsArray ? target.length : 0
+
+    /**
+     * 如果更新了 state.count 它之前是个 ref，那么会修改原始的 ref.value 的值 等于 newValue
+     * 如果 newValue 是一个 ref，那就不修改
+     */
+
+    if (isRef(oldValue) && !isRef(newValue)) {
+      // 这里修改了 ref 的值，是会触发 ref 的 set的，直接走 ref 的更新逻辑就行，直接返回 true,
+      // Reflect.set 放后面执行
+      oldValue.value = newValue
+      return true
+    }
+
+    // 这句代码执行之后，target[key] 的值就变成了 newValue， 顺序不能写反
+    const res = Reflect.set(target, key, newValue, receiver)
+
+    if (hasChanged(oldValue, newValue)) {
+      /**
+       * 触发更新， 设置值的时候，通知收集的依赖，重新执行
+       * 先 set 然后再通知
+       */
+      trigger(target, key)
+    }
+
+    const newLength = targetIsArray ? newValue.length : 0
+    // key 不是 length ，并且是数组，并且老的 length 和新的 length 不一样
+    // key 等于 length，就走上面的 hasChanged 逻辑
+    console.log('key', key)
+    if (targetIsArray && oldLength !== newLength && key !== 'length') {
+      console.log('隐式更新 length')
+      trigger(target, 'length')
+    }
+
+    return res
+  },
+}
+```
+
+![20250623112938](https://tuchuang.coder-sunshine.top/images/20250623112938.png)

@@ -16,21 +16,35 @@
 
       const arr = ref(['a', 'b', 'c', 'd'])
 
+      /**
+       * 隐式更新 length
+       * 更新前：length = 4 => ['a', 'b', 'c', 'd']
+       * 更新后：length = 5 => ['a', 'b', 'c', 'd', 'e']
+       * 更新动作，以 push 为例，追加了一个 e
+       * 隐式更新 length 的方法：push pop shift unshift
+       *
+       * 如何知道 隐式更新了 length
+       */
+
       effect(() => {
         // 可以重新执行，因为下标也是一个属性。
         // console.log(arr.value[0]) // target: arr, key: '0'
-
         // 这里会重新执行，因为 length 也是一个属性。
         // 但是更新 length 不止表面上的这么简单处理下，他会增加或者删除一些东西
-        // console.log(arr.value.length)
         // 比如这里原来访问了第三项，长度改为2,那肯定也要通知重新执行
-        console.log(arr.value[2])
+        // console.log(arr.value[2])
+
+        // 隐式更新 push 等操作 也会触发 effect 重新执行
+        console.log('effect执行=>', arr.value)
       })
 
       setTimeout(() => {
         // arr.value[0] = 'x'
 
-        arr.value.length = 2
+        // arr.value.length = 2
+
+        arr.value.push('e')
+        // arr.value.pop()
       }, 1000)
     </script>
   </body>
