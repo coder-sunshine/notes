@@ -4037,3 +4037,118 @@ export function watch(source, cb, options) {
   // ...
 }
 ```
+
+### 数组响应式
+
+#### 显示更新
+
+```js
+import { ref, effect, reactive } from '../dist/reactivity.esm.js'
+
+const arr = ref(['a', 'b', 'c', 'd'])
+
+effect(() => {
+  console.log(arr.value[0])
+})
+
+setTimeout(() => {
+  arr.value[0] = 'x'
+}, 1000)
+```
+
+![20250623093644](https://tuchuang.coder-sunshine.top/images/20250623093644.png)
+
+可以看到打印了 `a` 和 `x`
+
+> [!TIP] 原因：
+> 因为**数组也是一个特殊的对象**，这里 `target` 是 `arr`，`key` 为 `'0'`，所以修改的话会触发 `effect` 重新执行
+
+```js
+const arr = ref(['a', 'b', 'c', 'd'])
+
+effect(() => {
+  console.log(arr.value.length)
+})
+
+setTimeout(() => {
+  arr.value.length = 2
+}, 1000)
+```
+
+![20250623094105](https://tuchuang.coder-sunshine.top/images/20250623094105.png)
+
+这里修改了 `length` 也会触发 `effect` 重新执行。因为 `length` 也是 `arr` 上一个 特殊的属性。
+
+> [!WARNING] 注意：
+> 更新 `length` 不止表明上这么简单处理下，他会**增加或者删除**一些东西。
+
+```js
+const arr = ref(['a', 'b', 'c', 'd'])
+
+effect(() => {
+  // 这里原来访问了第三项，长度改为2,那肯定也要通知重新执行
+  console.log(arr.value[2])
+})
+
+setTimeout(() => {
+  arr.value.length = 2
+}, 1000)
+```
+
+![20250623094617](https://tuchuang.coder-sunshine.top/images/20250623094617.png)
+
+可以看到只打印了 `c`，我们期望应该是打印 `c` 和 `undefined`，可以在 `trigger` 方法中处理。拓展之前的 `trigger` 方法。**判断是否是数组**，数组走数组的逻辑
+
+- dep.ts
+
+```ts{8-38}
+// ...
+export function trigger(target, key) {
+  const depsMap = targetMap.get(target)
+  if (!depsMap) {
+    return
+  }
+
+  // 判断 target 是否是数组
+  const isArray = Array.isArray(target)
+
+  if (isArray) {
+    /**
+     * 更新数组的 length
+     * 更新前：length = 4 => ['a', 'b', 'c', 'd']
+     * 更新后：length = 2 => ['a', 'b']
+     * 得出结论：要通知 访问了 c 和 d 的 effect 重新执行，就是访问了大于等于 length 的索引
+     * depsMap = {
+     *   0:Dep,
+     *   1:Dep,
+     *   2:Dep,
+     *   3:Dep
+     *   length:Dep
+     * }
+     */
+
+    const length = target.length
+
+    // 循环遍历 depsMap
+    depsMap.forEach((dep, depKey) => {
+      if (depKey >= length || depKey === 'length') {
+        /**
+         * 通知访问了大于等于 length 的索引的 effect 重新执行
+         * 和 访问了 length 的 effect 重新执行
+         */
+        propagate(dep.subs)
+      }
+    })
+  } else {
+    const dep = depsMap.get(key)
+    if (!dep) {
+      return
+    }
+
+    // 通知 dep 对应的subs执行
+    propagate(dep.subs)
+  }
+}
+```
+
+![20250623101120](https://tuchuang.coder-sunshine.top/images/20250623101120.png)
