@@ -65,7 +65,6 @@ export function isRef(value: any) {
   return value ? value[ReactiveFlags.IS_REF] === true : false
 }
 
-
 /**
  * 收集依赖，建立 ref 和 effect 之间的链表关系
  * @param dep
@@ -80,4 +79,39 @@ export function trackRef(dep: Dependency) {
  */
 export function triggerRef(dep: Dependency) {
   dep.subs && propagate(dep.subs)
+}
+
+class ObjectRefImpl {
+  constructor(
+    public _object: object,
+    public _key: string
+  ) {}
+
+  // 为传入的 值 和 key 创建 getter 和 setter，还是相当于访问原对象
+  get value() {
+    return this._object[this._key]
+  }
+
+  set value(newVal) {
+    this._object[this._key] = newVal
+  }
+}
+
+export function toRef(source: Record<string, any>, key: string) {
+  if (isRef(source)) {
+    return source
+  }
+
+  return new ObjectRefImpl(source, key)
+}
+
+export function toRefs(source: Record<string, any>) {
+  // TODO: 这里还需要判断下是不是响应式数据
+  const res = {}
+
+  for (const key in source) {
+    res[key] = new ObjectRefImpl(source, key)
+  }
+
+  return res // a => ObjectRefImpl, b => ObjectRefImpl
 }

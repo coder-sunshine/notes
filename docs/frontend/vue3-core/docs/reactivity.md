@@ -4247,19 +4247,109 @@ import { ref, effect, reactive } from '../dist/reactivity.esm.js'
 
 const state = reactive({
   a: 1,
+  b: 2,
 })
 
-const { a } = state
+let { a, b } = state
 
 effect(() => {
-  console.log(a)
+  console.log(state.a)
 })
 
 setTimeout(() => {
-  state.a = 2
+  a = 2
 }, 1000)
 ```
 
 ![20250623173922](https://tuchuang.coder-sunshine.top/images/20250623173922.png)
 
-当解构后，就失去响应式了，因为解构出来的 a 和 state.a 不是一个引用地址了
+当解构后，就失去响应式了。因为被代理的是整个对象，解构出来的不是被代理的。可以使用 toRef 转化下，也就是访问 ref 等价于访问原来的对象。
+
+```ts
+class ObjectRefImpl {
+  constructor(
+    public _object: object,
+    public _key: string
+  ) {}
+
+  // 为传入的 值 和 key 创建 getter 和 setter，还是相当于访问原对象
+  get value() {
+    return this._object[this._key]
+  }
+
+  set value(newVal) {
+    this._object[this._key] = newVal
+  }
+}
+
+export function toRef(source: Record<string, any>, key: string) {
+  if (isRef(source)) {
+    return source
+  }
+
+  return new ObjectRefImpl(source, key)
+}
+```
+
+```js
+import { ref, effect, reactive, toRef } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 1,
+  b: 2,
+})
+
+// let { a, b } = state
+const a = toRef(state, 'a')
+
+effect(() => {
+  console.log(state.a)
+})
+
+setTimeout(() => {
+  a.value = 2
+}, 1000)
+```
+
+![20250624094533](https://tuchuang.coder-sunshine.top/images/20250624094533.png)
+
+#### toRefs
+
+```js
+import { ref, effect, reactive, toRef, toRefs } from '../dist/reactivity.esm.js'
+
+const state = reactive({
+  a: 1,
+  b: 2,
+})
+
+const { a, b } = toRefs(state)
+
+effect(() => {
+  console.log(state.a)
+  console.log(b.value)
+})
+
+setTimeout(() => {
+  a.value = 10
+  state.b = 20
+}, 1000)
+```
+
+一个个的 toRef 太麻烦了，可以直接传入一个响应式对象，循环调用 toRef处理就行了。
+
+```ts
+export function toRefs(source: Record<string, any>) {
+  // TODO: 这里还需要判断下是不是响应式数据
+  const res = {}
+
+  for (const key in source) {
+    // 循环处理
+    res[key] = new ObjectRefImpl(source, key)
+  }
+
+  return res // a => ObjectRefImpl, b => ObjectRefImpl
+}
+```
+
+![20250624112532](https://tuchuang.coder-sunshine.top/images/20250624112532.png)

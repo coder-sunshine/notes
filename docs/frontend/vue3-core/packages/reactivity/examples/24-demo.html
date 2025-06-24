@@ -10,24 +10,26 @@
       // import {
       //   ref,
       //   effect,
-      //  reactive
+      //   reactive,
+      //   toRefs,
       // } from '../../../node_modules/vue/dist/vue.esm-browser.js'
-      import { ref, effect, reactive, toRef } from '../dist/reactivity.esm.js'
+      import { ref, effect, reactive, toRef, toRefs } from '../dist/reactivity.esm.js'
 
       const state = reactive({
         a: 1,
         b: 2,
       })
 
-      // let { a, b } = state
-      const a = toRef(state, 'a')
+      const { a, b } = toRefs(state)
 
       effect(() => {
         console.log(state.a)
+        console.log(b.value)
       })
 
       setTimeout(() => {
-        a.value = 2
+        a.value = 10
+        state.b = 20
       }, 1000)
     </script>
   </body>
