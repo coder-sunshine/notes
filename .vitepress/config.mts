@@ -28,12 +28,12 @@ export default defineConfig({
       {
         text: '前端',
         items: [
+          { text: 'Vue3源码', link: '/docs/frontend/vue3-core/docs/index.md' },
           {
             text: 'React',
             link: '/docs/frontend/react/hook-test/index.md',
           },
           { text: '工程化', link: '/docs/frontend/engineering/rollup/quick-start/index.md' },
-          { text: 'Vue3源码', link: '/docs/frontend/vue3-core/docs/index.md' },
         ],
       },
     ],
@@ -75,6 +75,10 @@ export default defineConfig({
           text: '响应式原理',
           link: '/docs/frontend/vue3-core/docs/reactivity.md',
         },
+        {
+          text: '运行时',
+          link: '/docs/frontend/vue3-core/docs/runtime.md'
+        }
       ],
     },
 

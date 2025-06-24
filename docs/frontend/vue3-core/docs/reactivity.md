@@ -4185,7 +4185,7 @@ setTimeout(() => {
 
 ![20250623112747](https://tuchuang.coder-sunshine.top/images/20250623112747.png)
 
-可以看到目前 effect 只是初始化执行了一次，push 后也应该执行。
+可以看到目前 `effect` 只是初始化执行了一次，`push` 后也应该执行。
 
 - baseHandler.ts
 
@@ -4263,7 +4263,7 @@ setTimeout(() => {
 
 ![20250623173922](https://tuchuang.coder-sunshine.top/images/20250623173922.png)
 
-当解构后，就失去响应式了。因为被代理的是整个对象，解构出来的不是被代理的。可以使用 toRef 转化下，也就是访问 ref 等价于访问原来的对象。
+当解构后，就失去响应式了。因为被代理的是整个对象，解构出来的不是被代理的。可以使用 `toRef` 转化下，也就是访问 `ref` 等价于访问原来的对象。
 
 ```ts
 class ObjectRefImpl {
@@ -4336,7 +4336,7 @@ setTimeout(() => {
 }, 1000)
 ```
 
-一个个的 toRef 太麻烦了，可以直接传入一个响应式对象，循环调用 toRef处理就行了。
+一个个的 `toRef` 太麻烦了，可以直接传入一个响应式对象，循环调用 `toRef` 处理就行了。
 
 ```ts
 export function toRefs(source: Record<string, any>) {

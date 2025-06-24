@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <div id="app"></div>
+
+    <script type="module">
+      import { h, createRenderer } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+      import { nodeOps } from '../dist/vue.esm.js'
+
+      const vNode = h('div', 'hello word')
+
+      const renderer = createRenderer(nodeOps)
+
+      console.log(renderer)
+
+      renderer.render(vNode, app)
+    </script>
+  </body>
+</html>
