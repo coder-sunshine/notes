@@ -134,3 +134,93 @@ export const nodeOps = {
   4. `vue` 导出了 runtime-dom
 
 ![20250624164228](https://tuchuang.coder-sunshine.top/images/20250624164228.png)
+
+#### 2. 属性更新 patchProp
+
+![20250630132621](https://tuchuang.coder-sunshine.top/images/20250630132621.png)
+
+属性更新大致分为**四种情况**
+
+- class
+- style
+- event
+- attr
+
+##### 1. 类名更新 patchClass
+
+- runtime-dom/src/patchProp
+
+```ts
+export function patchProp(el, key, prevValue, nextValue) {
+  console.log('el', el)
+  console.log('key', key)
+  console.log('prevValue', prevValue)
+  console.log('nextValue', nextValue)
+}
+```
+
+在 index.ts 中将 createRenderer 需要的统一导出
+
+```ts{6,8}
+import { nodeOps } from './nodeOps'
+import { patchProp } from './patchProp'
+
+export * from '@vue/runtime-core'
+
+const renderOptions = { patchProp, ...nodeOps }
+
+export { renderOptions }
+```
+
+```js
+import { h, createRenderer } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+import { renderOptions } from '../dist/vue.esm.js'
+
+const vNode = h('div', { class: 'aaa' }, 'hello word')
+
+const renderer = createRenderer(renderOptions)
+
+const vNode2 = h('div', { class: 'bbb' }, 'hello word')
+
+renderer.render(vNode, app)
+
+setTimeout(() => {
+  // 替换 vNode 为 vNode2
+  renderer.render(vNode2, app)
+}, 1000)
+```
+
+![20250630135028](https://tuchuang.coder-sunshine.top/images/20250630135028.png)
+
+可以看到 **对应的参数值**，处理对应的值就行了。
+
+> [!TIP] class 分为两种情况
+> `nextValue` 有值，直接替换 `className` 就行。
+>
+> `nextValue` 没值，移除 `className`。
+
+```ts{5}
+// runtime-dom/src/patchProp.ts
+
+export function patchClass(el, value) {
+  // 如果新值没有值，则是要移除 class
+  // 用双等判断 null 也移除
+  if (value == undefined) {
+    el.removeAttribute('class')
+  } else {
+    // 如果新值有值，则设置 class
+    el.className = value
+  }
+}
+```
+
+![20250630135711](https://tuchuang.coder-sunshine.top/images/20250630135711.png)
+
+这个时候 `class` 就从 `aaa` 转化为 `bbb`
+
+如果把 `vNode2` 变成 `const vNode2 = h('div', 'hello word')`
+
+![20250630135844](https://tuchuang.coder-sunshine.top/images/20250630135844.png)
+
+`class` 就从 `aaa` 变没有了

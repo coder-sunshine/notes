@@ -11,15 +11,20 @@
     <script type="module">
       import { h, createRenderer } from '../../../node_modules/vue/dist/vue.esm-browser.js'
 
-      import { nodeOps } from '../dist/vue.esm.js'
+      import { renderOptions } from '../dist/vue.esm.js'
 
-      const vNode = h('div', 'hello word')
+      const vNode = h('div', { class: 'aaa' }, 'hello word')
 
-      const renderer = createRenderer(nodeOps)
+      const renderer = createRenderer(renderOptions)
 
-      console.log(renderer)
+      const vNode2 = h('div', 'hello word')
 
       renderer.render(vNode, app)
+
+      setTimeout(() => {
+        // 替换 vNode 为 vNode2
+        renderer.render(vNode2, app)
+      }, 1000)
     </script>
   </body>
 </html>
