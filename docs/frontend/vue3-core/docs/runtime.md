@@ -333,3 +333,172 @@ export function patchStyle(el, prevValue, nextValue) {
 ![20250630142010](https://tuchuang.coder-sunshine.top/images/20250630142010.png)
 
 ![20250630142016](https://tuchuang.coder-sunshine.top/images/20250630142016.png)
+
+##### 3. patchEvent
+
+```js
+const vNode = h(
+  'div',
+  {
+    class: 'aaa',
+    style: {
+      // color: 'red',
+      backgroundColor: 'red',
+    },
+    onClick: () => {
+      console.log('click vNode1')
+    },
+  },
+  'node1'
+)
+
+const vNode2 = h(
+  'div',
+  {
+    class: 'bbb',
+    style: {
+      color: 'blue',
+    },
+    onClick: () => {
+      console.log('click vNode2')
+    },
+  },
+  'node2'
+)
+```
+
+```ts
+export function patchEvent(el, rawName, prevValue, nextValue) {
+  const name = rawName.slice(2).toLowerCase()
+  // 之前有的去掉
+  if (prevValue) {
+    el.removeEventListener(name, prevValue)
+  }
+
+  // 新的加上
+  el.addEventListener(name, nextValue)
+}
+```
+
+![20250630143432](https://tuchuang.coder-sunshine.top/images/20250630143432.png)
+
+![20250630143441](https://tuchuang.coder-sunshine.top/images/20250630143441.png)
+
+把之前有的去掉，再把新的设置上去就行了。但是这样会有一定的效率问题。
+
+> [!WARNING] 问题
+> 如果我们一直是在操作某一个事件，例如 `click` 事件，那么如果事件更新的话，就需要一直去掉，重新设置等处理。既然都是同一个事件，只是调用不同的处理函数，那么只需要改变这一个函数就行了，**可以不直接绑定用户传递的事件函数，而是将事件绑定到一个对象的属性中，每次更新的时候，只需要更新这个对象的属性，就可以轻松的完成事件换绑**
+
+创建一个事件处理函数 `createInvoker` ，内部调用 `nextValue`
+
+```ts
+function createInvoker(fn) {
+  const invoker = e => {
+    invoker.value(e)
+  }
+  invoker.value = fn
+  // 返回 invoker 函数，这个函数内部调用 fn 函数
+  return invoker
+}
+
+export function patchEvent(el, rawName, prevValue, nextValue) {
+  const name = rawName.slice(2).toLowerCase()
+
+  // 之前有的去掉
+  if (prevValue) {
+    el.removeEventListener(name, prevValue)
+  }
+
+  const invoker = createInvoker(nextValue)
+
+  // 将 invoker 绑定到 el 上
+  el.addEventListener(name, invoker)
+}
+```
+
+下一次进来的时候拿到之前创建的 `invoker`，然后更改 `invoker.value` 就行了，但是这里目前是拿不到之前的 `invoker`，因为每次进来都重新创建了一个 `invoker`。可以将这个 `invoker` 保存到 `el` 上面。
+
+```ts{1,6}
+const veiKey = Symbol('_vei')
+
+export function patchEvent(el, rawName, prevValue, nextValue) {
+  const name = rawName.slice(2).toLowerCase()
+  // 有就获取，没有就是 空对象
+  const invokers = (el[veiKey] ??= {})
+
+  const existingInvoker = invokers[rawName]
+
+  // 如果之前有,则更新 invoker.value
+  if (existingInvoker) {
+    // 如果之前绑定了，那就更新 invoker.value 完成事件换绑
+    existingInvoker.value = nextValue
+    return
+  }
+
+  // 创建 invoker 函数
+  const invoker = createInvoker(nextValue)
+
+  // 将 invoker 保存到 el 上
+  invokers[rawName] = invoker
+
+  // 将 invoker 绑定到 el 上
+  el.addEventListener(name, invoker)
+}
+```
+
+![20250630152319](https://tuchuang.coder-sunshine.top/images/20250630152319.png)
+
+测试一下，效果是一样的。
+
+**还需要改一下，如果 nextValue 有，才需要去换绑等操作。如果新的事件没有，老的有，则需要移除事件。**
+
+```ts
+function createInvoker(fn) {
+  const invoker = e => {
+    invoker.value(e)
+  }
+  invoker.value = fn
+  // 返回 invoker 函数，这个函数内部调用 fn 函数
+  return invoker
+}
+
+const veiKey = Symbol('_vei')
+
+/**
+ * const fn1 = () => { console.log('更新之前的') }
+ * const fn2 = () => { console.log('更新之后的') }
+ * click el.addEventListener('click', (e) => { fn2(e) })
+ */
+export function patchEvent(el, rawName, prevValue, nextValue) {
+  const name = rawName.slice(2).toLowerCase()
+  // 有就获取，没有就是 空对象
+  const invokers = (el[veiKey] ??= {})
+
+  const existingInvoker = invokers[rawName]
+
+  if (nextValue) {
+    // 如果之前有,则更新 invoker.value
+    if (existingInvoker) {
+      // 如果之前绑定了，那就更新 invoker.value 完成事件换绑
+      existingInvoker.value = nextValue
+      return
+    }
+
+    // 创建 invoker 函数
+    const invoker = createInvoker(nextValue)
+
+    // 将 invoker 保存到 el 上
+    invokers[rawName] = invoker
+
+    // 将 invoker 绑定到 el 上
+    el.addEventListener(name, invoker)
+  } else {
+    /**
+     * 如果新的事件没有，老的有，就移除事件
+     */
+    if (existingInvoker) {
+      el.removeEventListener(name, existingInvoker)
+    }
+  }
+}
+```

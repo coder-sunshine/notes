@@ -21,8 +21,11 @@
             // color: 'red',
             backgroundColor: 'red',
           },
+          onClick: () => {
+            console.log('click vNode1')
+          },
         },
-        'hello word'
+        'node1'
       )
 
       const vNode2 = h(
@@ -32,8 +35,11 @@
           style: {
             color: 'blue',
           },
+          // onClick: () => {
+          //   console.log('click vNode2')
+          // },
         },
-        'hello word'
+        'node2'
       )
 
       const renderer = createRenderer(renderOptions)

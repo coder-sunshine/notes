@@ -1,5 +1,7 @@
+import { isOn } from '@vue/shared'
 import { patchClass } from './modules/patchClass'
 import { patchStyle } from './modules/patchStyle'
+import { patchEvent } from './modules/patchEvent'
 
 /**
  * 1. class
@@ -14,5 +16,9 @@ export function patchProp(el, key, prevValue, nextValue) {
 
   if (key === 'style') {
     patchStyle(el, prevValue, nextValue)
+  }
+
+  if (isOn(key)) {
+    patchEvent(el, key, prevValue, nextValue)
   }
 }

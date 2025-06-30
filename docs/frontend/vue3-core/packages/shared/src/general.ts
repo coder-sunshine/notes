@@ -3,3 +3,7 @@ export const isObject = (val: unknown): val is Record<any, any> => val !== null 
 export const hasChanged = (value: any, oldValue: any): boolean => !Object.is(value, oldValue)
 
 export const isFunction = (val: unknown): val is Function => typeof val === 'function'
+
+export function isOn(key: string) {
+  return /^on[A-Z]/.test(key)
+}
