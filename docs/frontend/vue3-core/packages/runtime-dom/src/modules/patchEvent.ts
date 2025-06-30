@@ -42,7 +42,10 @@ export function patchEvent(el, rawName, nextValue) {
      * 如果新的事件没有，老的有，就移除事件
      */
     if (existingInvoker) {
+      // 移除事件监听
       el.removeEventListener(name, existingInvoker)
+      // 移除 invokers 上的事件
+      invokers[rawName] = undefined
     }
   }
 }
