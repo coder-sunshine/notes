@@ -452,6 +452,8 @@ export function patchEvent(el, rawName, prevValue, nextValue) {
 
 **还需要改一下，如果 nextValue 有，才需要去换绑等操作。如果新的事件没有，老的有，则需要移除事件。**
 
+- 最终代码, prevValue 也不需要传
+
 ```ts
 function createInvoker(fn) {
   const invoker = e => {
@@ -469,7 +471,7 @@ const veiKey = Symbol('_vei')
  * const fn2 = () => { console.log('更新之后的') }
  * click el.addEventListener('click', (e) => { fn2(e) })
  */
-export function patchEvent(el, rawName, prevValue, nextValue) {
+export function patchEvent(el, rawName, nextValue) {
   const name = rawName.slice(2).toLowerCase()
   // 有就获取，没有就是 空对象
   const invokers = (el[veiKey] ??= {})
@@ -500,5 +502,87 @@ export function patchEvent(el, rawName, prevValue, nextValue) {
       el.removeEventListener(name, existingInvoker)
     }
   }
+}
+```
+
+##### 4. patchAttr
+
+```js{4,20}
+const vNode = h(
+  'div',
+  {
+    id: 'node1',
+    class: 'aaa',
+    style: {
+      // color: 'red',
+      backgroundColor: 'red',
+    },
+    onClick: () => {
+      console.log('click vNode1')
+    },
+  },
+  'node1'
+)
+
+const vNode2 = h(
+  'div',
+  {
+    id: 'node2',
+    class: 'bbb',
+    style: {
+      color: 'blue',
+    },
+    // onClick: () => {
+    //   console.log('click vNode2')
+    // },
+  },
+  'node2'
+)
+```
+
+`patchAttr` 很简单，有值就`更新`，没值就 `remove` 就行了
+
+```ts
+export function patchAttr(el, key, value) {
+  if (value == undefined) {
+    // null undefined 那就理解为要移除
+    el.removeAttribute(key)
+  } else {
+    el.setAttribute(key, value)
+  }
+}
+```
+
+![20250630153812](https://tuchuang.coder-sunshine.top/images/20250630153812.png)
+
+```ts
+// runtime-dom/src/index.ts
+
+import { isOn } from '@vue/shared'
+import { patchClass } from './modules/patchClass'
+import { patchStyle } from './modules/patchStyle'
+import { patchEvent } from './modules/patchEvent'
+import { patchAttr } from './modules/patchAttr'
+
+/**
+ * 1. class
+ * 2. style
+ * 3. event
+ * 4. attr
+ */
+export function patchProp(el, key, prevValue, nextValue) {
+  if (key === 'class') {
+    return patchClass(el, nextValue)
+  }
+
+  if (key === 'style') {
+    return patchStyle(el, prevValue, nextValue)
+  }
+
+  if (isOn(key)) {
+    return patchEvent(el, key, nextValue)
+  }
+
+  patchAttr(el, key, nextValue)
 }
 ```

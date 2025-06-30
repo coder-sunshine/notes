@@ -2,6 +2,7 @@ import { isOn } from '@vue/shared'
 import { patchClass } from './modules/patchClass'
 import { patchStyle } from './modules/patchStyle'
 import { patchEvent } from './modules/patchEvent'
+import { patchAttr } from './modules/patchAttr'
 
 /**
  * 1. class
@@ -11,14 +12,16 @@ import { patchEvent } from './modules/patchEvent'
  */
 export function patchProp(el, key, prevValue, nextValue) {
   if (key === 'class') {
-    patchClass(el, nextValue)
+    return patchClass(el, nextValue)
   }
 
   if (key === 'style') {
-    patchStyle(el, prevValue, nextValue)
+    return patchStyle(el, prevValue, nextValue)
   }
 
   if (isOn(key)) {
-    patchEvent(el, key, prevValue, nextValue)
+    return patchEvent(el, key, nextValue)
   }
+
+  patchAttr(el, key, nextValue)
 }

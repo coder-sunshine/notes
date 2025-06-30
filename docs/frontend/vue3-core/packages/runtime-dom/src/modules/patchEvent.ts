@@ -14,7 +14,7 @@ const veiKey = Symbol('_vei')
  * const fn2 = () => { console.log('更新之后的') }
  * click el.addEventListener('click', (e) => { fn2(e) })
  */
-export function patchEvent(el, rawName, prevValue, nextValue) {
+export function patchEvent(el, rawName, nextValue) {
   const name = rawName.slice(2).toLowerCase()
   // 有就获取，没有就是 空对象
   const invokers = (el[veiKey] ??= {})
