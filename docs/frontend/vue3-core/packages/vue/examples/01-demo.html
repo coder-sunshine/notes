@@ -13,11 +13,30 @@
 
       import { renderOptions } from '../dist/vue.esm.js'
 
-      const vNode = h('div', { class: 'aaa' }, 'hello word')
+      const vNode = h(
+        'div',
+        {
+          class: 'aaa',
+          style: {
+            // color: 'red',
+            backgroundColor: 'red',
+          },
+        },
+        'hello word'
+      )
+
+      const vNode2 = h(
+        'div',
+        {
+          class: 'bbb',
+          style: {
+            color: 'blue',
+          },
+        },
+        'hello word'
+      )
 
       const renderer = createRenderer(renderOptions)
-
-      const vNode2 = h('div', 'hello word')
 
       renderer.render(vNode, app)
 

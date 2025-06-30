@@ -146,7 +146,7 @@ export const nodeOps = {
 - event
 - attr
 
-##### 1. 类名更新 patchClass
+##### 1. patchClass
 
 - runtime-dom/src/patchProp
 
@@ -224,3 +224,112 @@ export function patchClass(el, value) {
 ![20250630135844](https://tuchuang.coder-sunshine.top/images/20250630135844.png)
 
 `class` 就从 `aaa` 变没有了
+
+##### 2. patchStyle
+
+```js
+const vNode = h(
+  'div',
+  {
+    class: 'aaa',
+    style: {
+      color: 'red',
+    },
+  },
+  'hello word'
+)
+
+const vNode2 = h(
+  'div',
+  {
+    class: 'bbb',
+    style: {
+      color: 'blue',
+    },
+  },
+  'hello word'
+)
+```
+
+把 `color` 从红色变成 蓝色。
+
+首先，肯定是把 `nextValue` 全部设置到 `style` 上面
+
+```ts
+export function patchStyle(el, prevValue, nextValue) {
+  const style = el.style
+
+  // 如果新值有值，则全部设置上去
+  if (nextValue) {
+    for (const key in nextValue) {
+      /**
+       * 把新的样式全部生效，设置到 style 中
+       */
+      style[key] = nextValue[key]
+    }
+  }
+}
+```
+
+![20250630141640](https://tuchuang.coder-sunshine.top/images/20250630141640.png)
+
+这样字体变蓝色。
+
+```js{7,18}
+const vNode = h(
+  'div',
+  {
+    class: 'aaa',
+    style: {
+      // color: 'red',
+      backgroundColor: 'red',
+    },
+  },
+  'hello word'
+)
+
+const vNode2 = h(
+  'div',
+  {
+    class: 'bbb',
+    style: {
+      color: 'blue',
+    },
+  },
+  'hello word'
+)
+```
+
+还需要把之前有的，现在没有的删掉。
+
+```ts
+export function patchStyle(el, prevValue, nextValue) {
+  const style = el.style
+
+  // 如果新值有值，则全部设置上去
+  if (nextValue) {
+    for (const key in nextValue) {
+      /**
+       * 把新的样式全部生效，设置到 style 中
+       */
+      style[key] = nextValue[key]
+    }
+  }
+
+  if (prevValue) {
+    for (const key in prevValue) {
+      /**
+       * 把之前有的，但是现在没有的，给它删掉
+       * 之前是 { background:'red' } => { color:'blue' } 就要把 backgroundColor 删掉，把 color 应用上
+       */
+      if (!(key in nextValue)) {
+        style[key] = null
+      }
+    }
+  }
+}
+```
+
+![20250630142010](https://tuchuang.coder-sunshine.top/images/20250630142010.png)
+
+![20250630142016](https://tuchuang.coder-sunshine.top/images/20250630142016.png)

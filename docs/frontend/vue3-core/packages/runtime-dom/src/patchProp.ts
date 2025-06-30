@@ -1,4 +1,5 @@
 import { patchClass } from './modules/patchClass'
+import { patchStyle } from './modules/patchStyle'
 
 /**
  * 1. class
@@ -7,12 +8,11 @@ import { patchClass } from './modules/patchClass'
  * 4. attr
  */
 export function patchProp(el, key, prevValue, nextValue) {
-  console.log('el', el)
-  console.log('key', key)
-  console.log('prevValue', prevValue)
-  console.log('nextValue', nextValue)
-
   if (key === 'class') {
     patchClass(el, nextValue)
+  }
+
+  if (key === 'style') {
+    patchStyle(el, prevValue, nextValue)
   }
 }
