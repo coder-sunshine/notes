@@ -9,3 +9,5 @@ export function isOn(key: string) {
 }
 
 export const isArray = Array.isArray
+
+export const isString = (val: unknown): val is string => typeof val === 'string'

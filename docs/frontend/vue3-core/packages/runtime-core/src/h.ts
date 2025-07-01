@@ -1,4 +1,5 @@
-import { isArray, isObject, ShapeFlags } from '@vue/shared'
+import { isArray, isObject } from '@vue/shared'
+import { createVNode, isVNode } from './vnode'
 
 /**
  * h 函数，主要的作用是对 createVNode 做一个参数标准化（归一化）
@@ -46,98 +47,4 @@ export function h(type, propsOrChildren?, children?) {
     // 要是只传了 type,就只渲染一个type就行了，例如 div
     return createVNode(type, propsOrChildren, children)
   }
-}
-
-/**
- * 判断是不是一个虚拟节点，根据 __v_isVNode 属性
- * @param value
- */
-function isVNode(value) {
-  return value?.__v_isVNode
-}
-
-/**
- * 创建虚拟节点的底层方法
- * @param type 节点类型
- * @param props 节点的属性
- * @param children 子节点
- */
-export function createVNode(type, props?, children?) {
-  const vnode = {
-    // 证明是一个虚拟DOM
-    __v_isVNode: true,
-    type,
-    props,
-    // 做 diff 算法
-    key: props?.key,
-    children,
-    // 虚拟节点要挂载的元素
-    el: null,
-    shapeFlag: 9,
-  }
-
-  return vnode
-}
-
-let shapeFlag = 0
-
-const vnode = {
-  __v_isVNode: true,
-  type: 'div',
-  children: [h('span', 'hello'), h('span', ' world')],
-  shapeFlag,
-}
-
-// 如果是一个dom元素，例如 div p 等
-if (typeof vnode.type === 'string') {
-  shapeFlag = ShapeFlags.ELEMENT // 1
-}
-
-// 如果 children 是一个 string
-if (typeof vnode.children === 'string') {
-  /**
-   * 或运算
-   * 0001
-   * 1000
-   * 1001
-   */
-  shapeFlag = shapeFlag | ShapeFlags.TEXT_CHILDREN // 1001
-}
-
-
-// 如果 children 是一个数组
-if (isArray(vnode.children)) {
-  shapeFlag = shapeFlag | ShapeFlags.ARRAY_CHILDREN // 10000
-}
-
-vnode.shapeFlag = shapeFlag
-
-if (vnode.shapeFlag & ShapeFlags.ELEMENT) {
-  /**
-   * 与运算
-   * 1001
-   * 0001
-   * 0001
-   */
-  console.log('是一个 dom 元素')
-}
-
-if (vnode.shapeFlag & ShapeFlags.TEXT_CHILDREN) {
-  /**
-   * 与运算 两个相同的位置，都是1，就是1
-   * 1001
-   * 1000
-   * 1000
-   */
-  console.log('子元素是一个纯文本节点')
-}
-
-if (vnode.shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
-  /**
-   * 与运算
-   * 01001
-   * 10000
-   * 00000
-   */
-  console.log('子元素是一个数组')
 }
