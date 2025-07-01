@@ -7,3 +7,5 @@ export const isFunction = (val: unknown): val is Function => typeof val === 'fun
 export function isOn(key: string) {
   return /^on[A-Z]/.test(key)
 }
+
+export const isArray = Array.isArray

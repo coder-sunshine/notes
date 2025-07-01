@@ -76,9 +76,13 @@ export default defineConfig({
           link: '/docs/frontend/vue3-core/docs/reactivity.md',
         },
         {
-          text: '运行时',
-          link: '/docs/frontend/vue3-core/docs/runtime.md'
-        }
+          text: '浏览器运行时 runtime-dom',
+          link: '/docs/frontend/vue3-core/docs/runtime-dom.md',
+        },
+        {
+          text: '核心运行时 runtime-core',
+          link: '/docs/frontend/vue3-core/docs/runtime-core.md',
+        },
       ],
     },
 
