@@ -13,13 +13,16 @@
 
       import { h, render } from '../dist/vue.esm.js'
 
-      const vnode = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
+      const vnode1 = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
+      const vnode2 = h('div', { class: 'container', style: { color: 'blue' } }, 'vnode2')
 
-      render(vnode, app)
+      render(vnode1, app)
 
       setTimeout(() => {
-        render(null, app)
-      }, 5000)
+        // render(null, app)
+        console.log('定时器执行了')
+        render(vnode2, app)
+      }, 2000)
     </script>
   </body>
 </html>

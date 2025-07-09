@@ -1,8 +1,5 @@
 export function patchStyle(el, prevValue, nextValue) {
   const style = el.style
-  console.log('prevValue', prevValue)
-
-  console.log('nextValue', nextValue)
 
   // 如果新值有值，则全部设置上去
   if (nextValue) {
@@ -16,7 +13,7 @@ export function patchStyle(el, prevValue, nextValue) {
 
   if (prevValue) {
     for (const key in prevValue) {
-      if (!(key in nextValue)) {
+      if (nextValue?.[key] == null) {
         style[key] = null
       }
     }

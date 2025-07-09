@@ -78,7 +78,43 @@ export function createRenderer(options) {
     hostInsert(el, container)
   }
 
-  const patchElement = (n1, n2) => {}
+  const patchProps = (el, oldProps, newProps) => {
+    // 清楚旧属性
+    if (oldProps) {
+      for (const key in oldProps) {
+        hostPatchProp(el, key, oldProps[key], null)
+      }
+    }
+
+    // 设置新属性
+    if (newProps) {
+      for (const key in newProps) {
+        hostPatchProp(el, key, null, newProps[key])
+      }
+    }
+  }
+
+  const patchChildren = (n1, n2) => {
+  }
+
+  const patchElement = (n1, n2) => {
+    /**
+     * 1. 复用 dom 元素
+     * 2. 更新 props
+     * 3. 更新 children
+     */
+    // 复用 dom 元素 每次进来，都拿上一次的 el，保存到最新的虚拟节点上 n2.el  const el = (n2.el = n1.el)
+    n2.el = n1.el
+    const el = n2.el
+
+    // 更新 el 的 props
+    const oldProps = n1.props
+    const newProps = n2.props
+    patchProps(el, oldProps, newProps)
+
+    // 更新 children
+    patchChildren(n1, n2)
+  }
 
   /**
    * 更新和挂载，都用这个函数
@@ -106,6 +142,7 @@ export function createRenderer(options) {
       mountElement(n2, container)
     } else {
       // 更新
+      console.log('更新')
       patchElement(n1, n2)
     }
   }

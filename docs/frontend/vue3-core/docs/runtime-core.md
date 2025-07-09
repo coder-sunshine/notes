@@ -672,3 +672,113 @@ setTimeout(() => {
 ![20250709164247](https://tuchuang.coder-sunshine.top/images/20250709164247.png)
 
 可以看到 div 已经被成功卸载了。
+
+#### patchElement
+
+`patchElement` 函数的作用是更新已经存在的 DOM 元素，以便复用现有的 `DOM` 结构并应用新的属性和子节点。具体来说，它分为以下几个步骤：
+
+1. **复用 `DOM` 元素**：将旧虚拟节点（`n1`）的 `DOM` 元素（`el`）赋值给新虚拟节点（`n2`），以便复用现有的 `DOM` 元素。
+2. **更新属性（`props`）**：调用 `patchProps` 函数，对比旧属性（`oldProps`）和新属性（`newProps`），并应用属性的变化。
+3. **更新子节点（`children`）**：调用 `patchChildren` 函数，对比旧子节点和新子节点，并应用子节点的变化。
+
+```ts
+const patchElement = (n1, n2) => {
+  /**
+   * 1. 复用 dom 元素
+   * 2. 更新 props
+   * 3. 更新 children
+   */
+  // 复用 dom 元素 每次进来，都拿上一次的 el，保存到最新的虚拟节点上 n2.el  const el = (n2.el = n1.el)
+  n2.el = n1.el
+  const el = n2.el
+
+  // 更新 el 的 props
+  const oldProps = n1.props
+  const newProps = n2.props
+  patchProps(el, oldProps, newProps)
+
+  // 更新 children
+  patchChildren(n1, n2)
+}
+```
+
+#### patchProps
+
+`patchProps` 函数的作用是**更新DOM元素的属性（`props`）**。具体来说，它执行以下操作：
+
+1. **清除旧属性**：如果存在旧属性（`oldProps`），它会遍历所有旧属性，并调用`hostPatchProp`函数将每个属性从`DOM`元素上移除。**这是通过将新值设为`null`来实现的**。
+2. **设置新属性**：如果存在新属性（`newProps`），它会遍历所有新属性，并调用`hostPatchProp`函数将每个属性设置到`DOM`元素上。这里会传入旧的属性值（`null`）和新的属性值，以便`hostPatchProp`函数能够进行更智能的更新。
+
+```ts
+const patchProps = (el, oldProps, newProps) => {
+  // 清楚旧属性
+  if (oldProps) {
+    for (const key in oldProps) {
+      hostPatchProp(el, key, oldProps[key], null)
+    }
+  }
+
+  // 设置新属性
+  for (const key in newProps) {
+    hostPatchProp(el, key, null, newProps[key])
+  }
+}
+```
+
+先测试下
+
+```js
+const vnode1 = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
+const vnode2 = h('div', { class: 'container', style: { color: 'blue' } }, 'vnode2')
+
+render(vnode1, app)
+
+setTimeout(() => {
+  // render(null, app)
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+![20250709171939](https://tuchuang.coder-sunshine.top/images/20250709171939.png)
+
+![20250709172019](https://tuchuang.coder-sunshine.top/images/20250709172019.png)
+
+报错了，这个错误的意思是 **无法在空值中使用`in`运算符查找`color`**
+
+因为这里在清除就属性的时候 `hostPatchProp`,最后一个参数 `nextValue` 传了 `null`
+
+![20250709172804](https://tuchuang.coder-sunshine.top/images/20250709172804.png)
+
+修改之前的 patchStyle 函数
+
+```ts
+export function patchStyle(el, prevValue, nextValue) {
+  const style = el.style
+  console.log('prevValue==>', prevValue)
+  console.log('nextValue==>', nextValue)
+
+  // 如果新值有值，则全部设置上去
+  if (nextValue) {
+    for (const key in nextValue) {
+      /**
+       * 把新的样式全部生效，设置到 style 中
+       */
+      style[key] = nextValue[key]
+    }
+  }
+
+  if (prevValue) {
+    for (const key in prevValue) {
+      if (!(key in nextValue)) { // [!code --]
+      if (nextValue?.[key] == null) { // [!code ++]
+        style[key] = null
+      }
+    }
+  }
+}
+```
+
+![20250709173118](https://tuchuang.coder-sunshine.top/images/20250709173118.png)
+
+这样字体就正常变成蓝色了
