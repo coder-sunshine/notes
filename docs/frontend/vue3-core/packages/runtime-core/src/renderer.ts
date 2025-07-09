@@ -95,6 +95,9 @@ export function createRenderer(options) {
   }
 
   const patchChildren = (n1, n2) => {
+    console.log('patchChildren')
+    console.log(n1)
+    console.log(n2)
   }
 
   const patchElement = (n1, n2) => {

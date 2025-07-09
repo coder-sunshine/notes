@@ -782,3 +782,20 @@ export function patchStyle(el, prevValue, nextValue) {
 ![20250709173118](https://tuchuang.coder-sunshine.top/images/20250709173118.png)
 
 这样字体就正常变成蓝色了
+
+#### patchChildren
+
+`patchChildren` 函数负责更新子元素，由于子元素的情况比较多，大概总结为以下情况
+
+- **新的子元素是文本**
+  - 老节点是数组，卸载老的 `children`，将新的文本设置成 `children`
+  - 老的是文本，直接替换
+  - 老的是 `null`，不用关心老的，将新的设置成 `children`
+- **新的子元素是数组**
+  - 老的是数组，那就和新的做全量 `diff`
+  - 老的是文本，把老的清空，挂载新的 `children`
+  - 老的是 `null`，不用关心老的，直接挂载新的 `children`
+- **新的子元素是 null**
+  - 老的是文本，把 `children` 设置成空
+  - 老的是数组，卸载老的
+  - 老的是 `null`，俩个哥们都是 `null`，不用干活
