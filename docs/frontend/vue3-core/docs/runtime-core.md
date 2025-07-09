@@ -387,3 +387,288 @@ export function createVNode(type, props?, children?) {
 ```
 
 暂时只处理上面几种情况
+
+### render 中的挂载，更新，卸载
+
+之前将 vnode 渲染到 app 上，一直使用的 vue 官方的 render 函数，接下来实现自己的 render 函数。
+
+- runtime-dom/src/index.ts
+
+```ts{14}
+import { nodeOps } from './nodeOps'
+import { patchProp } from './patchProp'
+import { createRenderer } from '@vue/runtime-core'
+
+export * from '@vue/runtime-core'
+
+const renderOptions = { patchProp, ...nodeOps }
+
+// 创建渲染器，根据传入的 renderOptions参数，
+const renderer = createRenderer(renderOptions)
+
+export function render(vnode, container) {
+  // 调用渲染器的 render 方法，将 vnode 渲染到 container 中
+  renderer.render(vnode, container)
+}
+
+export { renderOptions }
+```
+
+`renderer` 中的 `render` 函数跟我们组件中的 `render` 不是同一个 `render`，它是用来渲染根组件的，`render` 函数的作用是将虚拟节点（`vnode`）渲染到指定的容器（`container`）中。具体来说，它分为三个步骤：**挂载、更新和卸载**。
+
+- runtime-core/src/renderer.ts
+
+```ts
+import { ShapeFlags } from '@vue/shared'
+import { isSameVNodeType } from './vnode'
+
+export function createRenderer(options) {
+  const render = (vnode, container) => {
+    /**
+     * 分三个步骤：
+     * 1. 挂载：如果容器中没有之前的虚拟节点（container._vnode），则直接将新的虚拟节点挂载到容器中。
+     * 2. 更新：如果容器中有之前的虚拟节点，则对比新旧虚拟节点，并进行更新操作。
+     * 3. 卸载：如果传入的虚拟节点为 null，则卸载容器中现有的虚拟节点。
+     */
+
+    if (vnode == null) {
+      // Todo: 卸载
+    } else {
+      // 挂载或者是更新流程
+      patch(container._vnode || null, vnode, container)
+    }
+
+    // 把最新的 vnode 保存到 container 中，以便于下一次 diff 或者 卸载
+    container._vnode = vnode
+  }
+
+  return {
+    render,
+  }
+}
+```
+
+#### patch 函数
+
+`patch` 函数的作用是用于更新和挂载虚拟节点（`vnode`）。具体来说，它会根据传入的老节点（`n1`）和新节点（`n2`）的情况，**决定是进行挂载操作还是更新操作**。函数的逻辑如下：
+
+1. **相同节点检查**：如果传入的老节点和新节点是同一个节点，则不进行任何操作。
+2. **类型检查**：如果老节点存在，且老节点和新节点的类型不同，则卸载老节点，并将老节点设为 null。
+3. **挂载**：如果老节点为 null，则直接挂载新节点到容器中。
+4. **更新**：如果老节点存在且类型相同，则进行更新操作。
+
+```ts
+/**
+ * 更新和挂载，都用这个函数
+ * @param n1 老节点，之前的，如果有，表示要跟 n2 做 diff，更新，如果没有，表示直接挂载 n2
+ * @param n2 新节点
+ * @param container 要挂载的容器
+ */
+const patch = (n1, n2, container) => {
+  // 如果 n1 和 n2 一样，则不需要做任何操作
+  if (n1 === n2) {
+    return
+  }
+
+  // 如果两个节点类型不一样，则直接销毁老的，创建新的
+  if (n1 && !isSameVNodeType(n1, n2)) {
+    // 比如说 n1 是 div ，n2 是 span，这俩就不一样，或者 n1 的 key 是1，n2 的 key 是 2，也不一样，都要卸载掉 n1
+    // 如果两个节点不是同一个类型，那就卸载 n1 直接挂载 n2
+    unmount(n1)
+    // 把 n1 设置为 null, 那么走到下面判断 就是走挂载新的逻辑
+    n1 = null
+  }
+
+  if (n1 == null) {
+    // 挂载新的
+    mountElement(n2, container)
+  } else {
+    // 更新
+    patchElement(n1, n2)
+  }
+}
+```
+
+`isSameVNodeType` 是一个辅助函数，用来判断节点是否可以复用。
+
+```ts
+// runtime-dom/src/vnode.ts
+
+/**
+ * 判断两个虚拟节点是否是同一个类型
+ * @param n1 老节点
+ * @param n2 新节点
+ */
+export function isSameVNodeType(n1, n2) {
+  return n1.type === n2.type && n1.key === n2.key
+}
+```
+
+可以看到这个判断逻辑中，必须是相同的 `type`，并且 `key` 也相同，才可以复用，那就是说，`div` 和 `p` 这两个标签，是不能复用的，不同的 `key` 亦是如此，但是如果没有传递 `key`，那就表示 `key` 是 `undefined`，两个 `undefined` 是相同的，所以没传 `key`，就意味着 `key` 相等。
+
+#### mountElement 挂载函数
+
+`mountElement` 函数会将虚拟节点（`vnode`）挂载到指定的容器（`container`）中。具体来说，分为以下几个步骤：
+
+1. **创建一个 DOM 节点**：根据虚拟节点的类型（`type`），创建一个对应的 `DOM` 元素，并将其赋值给虚拟节点的 `el` 属性(**这样后续可以通过 vnode.el 拿到对应dom，做卸载更新操作**)。
+2. **设置节点的属性**：遍历虚拟节点的属性（`props`），并使用 `hostPatchProp` 函数将这些属性设置到刚创建的 `DOM` 元素上。
+3. **挂载子节点**：根据虚拟节点的 `shapeFlag` 判断子节点的类型。如果子节点是文本，则使用 `hostSetElementText` 函数设置文本内容；如果子节点是数组，则递归调用 `mountChildren` 函数挂载每一个子节点。
+4. **插入到容器中**：最后，将创建好的 `DOM` 元素插入到指定的容器中
+
+```ts
+// 挂载节点
+
+export function createRenderer(options) {
+  // 拿到 nodeOps 里面的操作 Dom 方法
+  // 拿到 patchProp 方法，用来处理 props
+  const {
+    createElement: hostCreateElement,
+    insert: hostInsert,
+    remove: hostRemove,
+    setElementText: hostSetElementText,
+    createText: hostCreateText,
+    setText: hostSetText,
+    parentNode: hostParentNode,
+    nextSibling: hostNextSibling,
+    patchProp: hostPatchProp,
+  } = options
+
+  const mountElement = (vnode, container) => {
+    /**
+     * 1. 创建一个 dom 节点
+     * 2. 设置它的 props
+     * 3. 挂载它的子节点
+     */
+    const { type, props, shapeFlag, children } = vnode
+
+    // 1. 创建 Dom 元素 type --> div  p  span 等
+    const el = hostCreateElement(type)
+
+    // 给 vnode 上的 el 属性赋值，后续可以方便获取到 Dom 元素，做更新，卸载等操作
+    vnode.el = el
+
+    // 2. 设置它的 props
+    for (const key in props) {
+      // prevValue 为 null，因为是挂载操作，之前的没有值
+      hostPatchProp(el, key, null, props[key])
+    }
+
+    // 3. 挂载它的子节点
+    if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+      // 子节点是文本
+      hostSetElementText(el, children)
+    } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+      // 子节点是数组
+      mountChildren(children, el)
+    }
+
+    // 处理完后把 el 插入到 container 中
+    hostInsert(el, container)
+  }
+}
+```
+
+这里还从 options 里面拿到了传入进来 patchProp，和 nodeOpts 里面的操作 dom 的方法
+
+#### mountChildren 挂载子元素
+
+```ts
+// 挂载子元素
+const mountChildren = (children, container) => {
+  for (let i = 0; i < children.length; i++) {
+    // 递归挂载子节点
+    // n1 为 null，表示直接挂载
+    patch(null, children[i], container)
+  }
+}
+```
+
+测试下挂载操作是否正常
+
+```js
+// import { render } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+import { h, render } from '../dist/vue.esm.js'
+
+const vnode = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
+
+render(vnode, app)
+```
+
+![20250709162227](https://tuchuang.coder-sunshine.top/images/20250709162227.png)
+
+成功设置上去了，接下来处理卸载
+
+#### unmount 函数
+
+```ts{9-13}
+const render = (vnode, container) => {
+  /**
+   * 分三个步骤：
+   * 1. 挂载：如果容器中没有之前的虚拟节点（container._vnode），则直接将新的虚拟节点挂载到容器中。
+   * 2. 更新：如果容器中有之前的虚拟节点，则对比新旧虚拟节点，并进行更新操作。
+   * 3. 卸载：如果传入的虚拟节点为 null，则卸载容器中现有的虚拟节点。
+   */
+
+  if (vnode == null) {
+    // 卸载
+    if (container._vnode) {
+      unmount(container._vnode)
+    }
+  } else {
+    // 挂载或者是更新流程
+    patch(container._vnode || null, vnode, container)
+  }
+
+  // 把最新的 vnode 保存到 container 中，以便于下一次 diff 或者 卸载
+  container._vnode = vnode
+}
+```
+
+`unmount` 函数会卸载虚拟节点（`vnode`）。具体来说，它会根据虚拟节点的类型和子节点的情况，递归地卸载所有子节点，并最终移除对应的 `DOM` 元素。
+
+1. **检查子节点类型**：如果虚拟节点的子节点是数组类型，则递归卸载所有子节点。
+2. **移除 `DOM` 元素**：调用 `hostRemove` 函数移除虚拟节点对应的 `DOM` 元素。
+
+```ts
+// 卸载
+const unmount = vnode => {
+  const { shapeFlag, children } = vnode
+  // 如果子节点是数组，则递归卸载
+  if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+    unmountChildren(children)
+  }
+
+  // 移除dom元素
+  hostRemove(vnode.el)
+}
+```
+
+#### unmountChildren 卸载子元素
+
+```ts
+const unmountChildren = children => {
+  for (let i = 0; i < children.length; i++) {
+    unmount(children[i])
+  }
+}
+```
+
+测试卸载
+
+```js
+const vnode = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
+
+render(vnode, app)
+
+setTimeout(() => {
+  // 5秒后卸载 vnode
+  render(null, app)
+}, 5000)
+```
+
+![20250709164240](https://tuchuang.coder-sunshine.top/images/20250709164240.png)
+
+![20250709164247](https://tuchuang.coder-sunshine.top/images/20250709164247.png)
+
+可以看到 div 已经被成功卸载了。

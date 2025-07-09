@@ -1,6 +1,15 @@
 import { isArray, isString, ShapeFlags } from '@vue/shared'
 
 /**
+ * 判断两个虚拟节点是否是同一个类型
+ * @param n1 老节点
+ * @param n2 新节点
+ */
+export function isSameVNodeType(n1, n2) {
+  return n1.type === n2.type && n1.key === n2.key
+}
+
+/**
  * 判断是不是一个虚拟节点，根据 __v_isVNode 属性
  * @param value
  */
