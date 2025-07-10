@@ -95,9 +95,65 @@ export function createRenderer(options) {
   }
 
   const patchChildren = (n1, n2) => {
-    console.log('patchChildren')
-    console.log(n1)
-    console.log(n2)
+    const el = n2.el
+    const prevShapeFlag = n1.shapeFlag
+    const shapeFlag = n2.shapeFlag
+
+    //  新的是文本
+    if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+      // 老的是数组
+      if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        // 卸载老的
+        unmountChildren(n1.children)
+      }
+
+      // 老的和新的不一样
+      if (n1.children !== n2.children) {
+        // 将新文本设置成 children
+        hostSetElementText(el, n2.children)
+      }
+    } else {
+      /**
+       * 新的是有可能 数组 或者是 null
+       * 老的有可能 数组 或者是 文本 或者是 null
+       */
+
+      // 老的是文本
+      if (prevShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+        // 把老的文本清空
+        hostSetElementText(el, '')
+
+        // 新的是数组
+        if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+          // 挂载新的
+          mountChildren(n2.children, el)
+        }
+
+        // 是 null 就不管，
+      } else {
+        /**
+         * 老的是数组 或者 null
+         * 新的还是 数组 或者 null
+         */
+
+        // 老的是数组
+        if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+          // 新的也是数组
+          if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+            // Todo 全量 diff
+          } else {
+            // 老的是数组，新的为 null
+            unmountChildren(n1.children)
+          }
+        } else {
+          // 老的是 null
+          if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+            // 新的是数组,挂载新的
+            mountChildren(n2.children, el)
+          }
+        }
+      }
+    }
   }
 
   const patchElement = (n1, n2) => {

@@ -23,7 +23,7 @@ export function isVNode(value) {
  * @param props 节点的属性
  * @param children 子节点
  */
-export function createVNode(type, props?, children?) {
+export function createVNode(type, props?, children = null) {
   let shapeFlag
 
   if (isString(type)) {

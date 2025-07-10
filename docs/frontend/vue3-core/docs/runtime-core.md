@@ -57,7 +57,7 @@ import { isArray, isObject } from '@vue/shared'
 /**
  * h 函数，主要的作用是对 createVNode 做一个参数标准化（归一化）
  */
-export function h(type, propsOrChildren?, children?) {
+export function h(type, propsOrChildren?, children) {
   // 根据参数的长度先做判断，
   const l = arguments.length
 
@@ -116,7 +116,7 @@ function isVNode(value) {
  * @param props 节点的属性
  * @param children 子节点
  */
-export function createVNode(type, props?, children?) {
+export function createVNode(type, props?, children = null) {
   const vnode = {
     // 证明是一个虚拟DOM
     __v_isVNode: true,
@@ -356,7 +356,7 @@ export function isVNode(value) {
  * @param props 节点的属性
  * @param children 子节点
  */
-export function createVNode(type, props?, children?) {
+export function createVNode(type, props?, children = null) {
   let shapeFlag
 
   if (isString(type)) {
@@ -799,3 +799,86 @@ export function patchStyle(el, prevValue, nextValue) {
   - 老的是文本，把 `children` 设置成空
   - 老的是数组，卸载老的
   - 老的是 `null`，俩个哥们都是 `null`，不用干活
+
+```ts
+const patchChildren = (n1, n2) => {
+  const el = n2.el
+  const prevShapeFlag = n1.shapeFlag
+  const shapeFlag = n2.shapeFlag
+
+  //  新的是文本
+  if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+    // 老的是数组
+    if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+      // 卸载老的
+      unmountChildren(n1.children)
+    }
+
+    // 老的和新的不一样
+    if (n1.children !== n2.children) {
+      // 将新文本设置成 children
+      hostSetElementText(el, n2.children)
+    }
+  } else {
+    /**
+     * 新的是有可能 数组 或者是 null
+     * 老的有可能 数组 或者是 文本 或者是 null
+     */
+
+    // 老的是文本
+    if (prevShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+      // 把老的文本清空
+      hostSetElementText(el, '')
+
+      // 新的是数组
+      if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        // 挂载新的
+        mountChildren(n2.children, el)
+      }
+
+      // 是 null 就不管，
+    } else {
+      /**
+       * 老的是数组 或者 null
+       * 新的还是 数组 或者 null
+       */
+
+      // 老的是数组
+      if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        // 新的也是数组
+        if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+          // Todo 全量 diff
+        } else {
+          // 老的是数组，新的为 null
+          unmountChildren(n1.children)
+        }
+      } else {
+        // 老的是 null
+        if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+          // 新的是数组,挂载新的
+          mountChildren(n2.children, el)
+        }
+      }
+    }
+  }
+}
+```
+
+测试
+
+```js
+const vnode1 = h('div', { class: 'container', style: { color: 'red' } }, [h('p', '123'), h('p', '456')])
+const vnode2 = h('div', { class: 'container', style: { backgroundColor: 'blue', height: '100px' } })
+
+render(vnode1, app)
+
+setTimeout(() => {
+  // render(null, app)
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+![20250710134557](https://tuchuang.coder-sunshine.top/images/20250710134557.png)
+
+![20250710134603](https://tuchuang.coder-sunshine.top/images/20250710134603.png)

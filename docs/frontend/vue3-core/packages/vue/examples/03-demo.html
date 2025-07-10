@@ -13,8 +13,8 @@
 
       import { h, render } from '../dist/vue.esm.js'
 
-      const vnode1 = h('div', { class: 'container', style: { color: 'red' } }, 'hello world')
-      const vnode2 = h('div', { class: 'container', style: { color: 'blue' } }, 'vnode2')
+      const vnode1 = h('div', { class: 'container', style: { color: 'red' } }, [h('p', '123'), h('p', '456')])
+      const vnode2 = h('div', { class: 'container', style: { backgroundColor: 'blue', height: '100px' } })
 
       render(vnode1, app)
 
