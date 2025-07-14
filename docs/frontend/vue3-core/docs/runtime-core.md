@@ -882,3 +882,344 @@ setTimeout(() => {
 ![20250710134557](https://tuchuang.coder-sunshine.top/images/20250710134557.png)
 
 ![20250710134603](https://tuchuang.coder-sunshine.top/images/20250710134603.png)
+
+### diff 算法
+
+**全量 diff 主要是针对两个子节点都是数组的情况，我们需要对它所有的子元素进行全量更新，那么这种更新非常消耗性能，在 vue 中会尝试着尽可能的服用 dom，来进行更新。**
+
+#### 双端 diff
+
+##### 头部对比
+
+```js
+import { h, render } from '../dist/vue.esm.js'
+
+const vnode1 = h('div', { style: { color: 'red' } }, [h('p', { key: 'a' }, 'a'), h('p', { key: 'b' }, 'b')])
+const vnode2 = h('div', { style: { color: 'blue' } }, [
+  h('p', { key: 'a' }, 'a'),
+  h('p', { key: 'b' }, 'b'),
+  h('p', { key: 'c' }, 'c'),
+  h('p', { key: 'd' }, 'd'),
+])
+
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+假设子节点是通过 `v-for` 遍历渲染出来的，最开始数组为 `c1 = [a,b]`，更新后为 `c2 = [a,b,c,d]`，此时需要**从头开始依次进行对比**，`c1` 的第一个为 `a`，`c2` 的第一个也是 `a`，他们的 `key` 都是可以对应的上的，所以依次对比 `a` 和 `b`，到 `c` 之后，发现 `c1` 里面没有 `c`，那就直接挂载新的子节点就可以了
+
+```ts
+const patchKeyedChildren = (c1, c2, container) => {
+  /**
+   * 双端对比
+   * 1. 头部对比
+   * 2. 尾部对比
+   * old: [a,b]
+   * new: [a,b,c,d]
+   */
+
+  let i = 0
+  // 老的子节点最后一个元素的下标
+  let e1 = c1.length - 1 // 1
+  // 新的子节点最后一个元素的下标
+  let e2 = c2.length - 1 // 3
+
+  // 1. 头部对比
+  while (i <= e1 && i <= e2) {
+    const n1 = c1[i]
+    const n2 = c2[i]
+
+    // 如果是相同类型，则直接 patch 对比
+    if (isSameVNodeType(n1, n2)) {
+      patch(n1, n2, container)
+    } else {
+      break
+    }
+
+    i++
+  }
+
+  console.log('i==>', i)
+  console.log('e1==>', e1)
+  console.log('e2==>', e2)
+}
+```
+
+![20250714095438](https://tuchuang.coder-sunshine.top/images/20250714095438.png)
+
+![20250714095527](https://tuchuang.coder-sunshine.top/images/20250714095527.png)
+
+可以看到 `i` 此时为 `2`，`2` 大于 `e1` 所以就跳出 `while` 循环了
+
+##### 尾部对比
+
+```js
+const vnode1 = h('div', [h('p', { key: 'a', style: { color: 'red' } }, 'a'), h('p', { key: 'b', style: { color: 'red' } }, 'b')])
+const vnode2 = h('div', [
+  h('p', { key: 'c', style: { color: 'blue' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'blue' } }, 'd'),
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+])
+
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+有的时候并不是在尾巴插入新的元素，也可能是从头部插入新的元素，例如 `c1 = [a,b]`，更新后为 `c2 = [c,d,a,b]`，第一次 `a` 和 `c` 就对比不上了，就跳出循环了，**此时需要看下尾部能不能对比上，从尾部就行对比**
+
+```ts
+const patchKeyedChildren = (c1, c2, container) => {
+  /**
+   * 双端对比
+   * 1. 头部对比
+   * old: [a,b]
+   * new: [a,b,c,d]
+   */
+
+  let i = 0
+  // 老的子节点最后一个元素的下标
+  let e1 = c1.length - 1 // 1
+  // 新的子节点最后一个元素的下标
+  let e2 = c2.length - 1 // 3
+
+  // 1. 头部对比
+  // ... 头部对比代码
+
+  /**
+   * 双端对比
+   * 2. 尾部对比
+   * old: [a,b]
+   * new: [c,d,a,b]
+   */
+
+  //  尾部对比
+  while (i <= e1 && i <= e2) {
+    const n1 = c1[e1]
+    const n2 = c2[e2]
+
+    // 如果是相同类型，则直接 patch 对比
+    if (isSameVNodeType(n1, n2)) {
+      patch(n1, n2, container)
+    } else {
+      break
+    }
+
+    e1--
+    e2--
+  }
+
+  console.log('i==>', i)
+  console.log('e1==>', e1)
+  console.log('e2==>', e2)
+}
+```
+
+![20250714104534](https://tuchuang.coder-sunshine.top/images/20250714104534.png)
+
+![20250714104541](https://tuchuang.coder-sunshine.top/images/20250714104541.png)
+
+还有 c1 比 c2 长的情况。
+
+头部对比
+
+```js
+const vnode1 = h('div', [
+  h('p', { key: 'a', style: { color: 'red' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'red' } }, 'b'),
+  h('p', { key: 'c', style: { color: 'red' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+])
+const vnode2 = h('div', [
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+])
+```
+
+![20250714105134](https://tuchuang.coder-sunshine.top/images/20250714105134.png)
+
+![20250714105148](https://tuchuang.coder-sunshine.top/images/20250714105148.png)
+
+尾部对比
+
+```js
+const vnode1 = h('div', [
+  h('p', { key: 'c', style: { color: 'red' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+  h('p', { key: 'a', style: { color: 'red' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'red' } }, 'b'),
+])
+const vnode2 = h('div', [
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+])
+```
+
+![20250714105230](https://tuchuang.coder-sunshine.top/images/20250714105230.png)
+
+![20250714105243](https://tuchuang.coder-sunshine.top/images/20250714105243.png)
+
+##### 结论
+
+第一种情况对比后 (头部对比，新的长)
+
+old: [a,b]
+new: [a,b,c,d]
+
+- i ==> 2
+- e1 ==> 1
+- e2 ==> 3
+
+第二种情况对比后 (尾部对比，新的长)
+
+old: [a,b]
+new: [c,d,a,b]
+
+- i ==> 0
+- e1 ==> -1
+- e2 ==> 1
+
+第三种情况对比后 (头部对比，新的短)
+old: [a,b,c,d]
+new: [a,b]
+
+- i ==> 2
+- e1 ==> 3
+- e2 ==> 1
+
+第四种情况对比后 (尾部对比，新的短)
+old: [c,d,a,b]
+new: [a,b]
+
+- i ==> 2
+- e1 ==> 3
+- e2 ==> 1
+
+当双端 `diff` 完成后，我们可以得出以下结论，当 `i > e1` 的时候，表示新的子节点多，老的子节点少，所以我们需要插入新的子节点，插入的范围为 `i -> e2`，反之当 `i > e2` 的时候，表示老的多，新的少，需要将老的子节点中多余的卸载掉，代码实现如下：
+
+```ts
+if (i > e1) {
+  /**
+   * 根据双端对比，得出结论：
+   * i > e1 表示老的少，新的多，要挂载新的，挂载的范围是 i -> e2
+   */
+
+  while (i <= e2) {
+    patch(null, c2[i], container)
+    i++
+  }
+} else if (i > e2) {
+  /**
+   * 根据双端对比，得出结果：
+   * i > e2 的情况下，表示老的多，新的少，要把老的里面多余的卸载掉，卸载的范围是 i - e1
+   */
+  while (i <= e1) {
+    unmount(c1[i])
+    i++
+  }
+}
+```
+
+![20250714133544](https://tuchuang.coder-sunshine.top/images/20250714133544.png)
+
+![20250714133552](https://tuchuang.coder-sunshine.top/images/20250714133552.png)
+
+这样就成功把 `c,d` 添加到 `vnode2` 上了，但是这样在 `patch` 的时候可能会有点问题，有的时候不是直接添加到后面的，可能会从前面添加
+
+```js
+const vnode1 = h('div', [h('p', { key: 'a', style: { color: 'red' } }, 'a'), h('p', { key: 'b', style: { color: 'red' } }, 'b')])
+
+const vnode2 = h('div', [
+  h('p', { key: 'c', style: { color: 'red' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+])
+```
+
+![20250714133957](https://tuchuang.coder-sunshine.top/images/20250714133957.png)
+
+这样的话结果还是这样，很明显不对，在插入的时候，比如c应该是插在 `a` 的前面，然后 `d` 也是插在 `a` 的前面，也就是这里锚点元素是 `a`，这里需要改掉之前的**挂载元素**的方法,也就是 `mountElement` 最后在**插入节点**的时候需要把 **锚点** 传过去
+
+```ts
+
+// 修改 mountElement 函数，添加 anchor 锚点参数
+
+// 挂载节点
+const mountElement = (vnode, container) => { // [!code --]
+const mountElement = (vnode, container, anchor) => { // [!code ++]
+  // ...
+
+  // 处理完后把 el 插入到 container 中
+  hostInsert(el, container) // [!code --]
+  hostInsert(el, container, anchor) // [!code ++]
+}
+```
+
+那么 patch 函数也需要接受 锚点参数
+
+```ts
+/**
+ * 更新和挂载，都用这个函数
+ * @param n1 老节点，之前的，如果有，表示要跟 n2 做 diff，更新，如果没有，表示直接挂载 n2
+ * @param n2 新节点
+ * @param container 要挂载的容器
+ * @param anchor 锚点
+ */
+const patch = (n1, n2, container, anchor = null) => {
+  // ...
+
+  if (n1 == null) {
+    // 挂载新的
+    mountElement(n2, container, anchor)
+  } else {
+    // 更新
+    patchElement(n1, n2)
+  }
+}
+```
+
+这样在对比的时候，插入元素的时候就可以先拿到 **锚点**，然后把需要插入的**元素都插到锚点之前**就行了。
+
+```ts
+// ... 省略 双端 diff
+
+if (i > e1) {
+  /**
+   * 根据双端对比，得出结论：
+   * i > e1 表示老的少，新的多，要挂载新的，挂载的范围是 i -> e2
+   */
+
+  // 锚点元素就是下一个元素
+  const nextPos = e2 + 1
+
+  const anchor = nextPos < c2.length ? c2[nextPos].el : null
+  console.log(anchor)
+
+  while (i <= e2) {
+    patch(null, c2[i], container)
+    i++
+  }
+} else if (i > e2) {
+  /**
+   * 根据双端对比，得出结果：
+   * i > e2 的情况下，表示老的多，新的少，要把老的里面多余的卸载掉，卸载的范围是 i - e1
+   */
+  while (i <= e1) {
+    unmount(c1[i])
+    i++
+  }
+}
+```
+
+![20250714142357](https://tuchuang.coder-sunshine.top/images/20250714142357.png)
+
+可以看到 锚点元素 就是 `a`，然后把 `c,d` 全部插入到 `a` 前面就行了。
