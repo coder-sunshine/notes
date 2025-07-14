@@ -1223,3 +1223,139 @@ if (i > e1) {
 ![20250714142357](https://tuchuang.coder-sunshine.top/images/20250714142357.png)
 
 可以看到 锚点元素 就是 `a`，然后把 `c,d` 全部插入到 `a` 前面就行了。
+
+#### 乱序 diff
+
+双端 diff 只是建立在数据比较理想的情况下，顺序也没有变，这种情况下是比较容易对比的，如果数据乱序了呢？
+
+```js
+// c1 => [a, b, c, d, e]
+const vnode1 = h('div', [
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+  h('p', { key: 'c', style: { color: 'blue' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'blue' } }, 'd'),
+  h('p', { key: 'e', style: { color: 'blue' } }, 'e'),
+])
+
+// c2 => [a, c, d, b, e]
+const vnode2 = h('div', [
+  h('p', { key: 'a', style: { color: 'red' } }, 'a'),
+  h('p', { key: 'c', style: { color: 'red' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+  h('p', { key: 'b', style: { color: 'red' } }, 'b'),
+  h('p', { key: 'e', style: { color: 'red' } }, 'e'),
+])
+```
+
+在这组数据中，我们可以看到，数据从 `[a, b, c, d, e]` 变为 `[a, c, d, b, e]`，这样的话顺序就发生了变化，但是这些 `key` 还是在的，所以我们就需要去找到对应的 `key`，进行 `patch`，此处我们先不考虑顺序的问题，看图
+
+![20250714160725](https://tuchuang.coder-sunshine.top/images/20250714160725.png)
+
+当双端 `diff` 结束后，此时 `i = 1,e1 = 3,e2 = 3`，此时 `i` 既不大于 `e1` 也不小于 `e2`，中间还有三个没有对比完，但是这些 `key` 还是在的，所以我们需要到 `c1` 中找到对应 `key` 的虚拟节点，进行 `patch`：
+
+```ts
+const patchKeyedChildren = (c1, c2, container) => {
+  // ...
+  if (i > e1) {
+    // ...
+  } else if (i > e2) {
+    // ...
+  } else {
+    /**
+     * 乱序对比
+     */
+
+    // 老的子节点开始查找的位置
+    let s1 = i
+    // 新的子节点开始查找的位置
+    let s2 = i
+
+    // 需要一个映射表，遍历新的还没有更新的 也就是 s2 -> e2 的节点，建立一个映射表
+    // 然后遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+    const keyToNewIndexMap = new Map()
+
+    for (let j = s2; j <= e2; j++) {
+      const n2 = c2[j]
+      keyToNewIndexMap.set(n2.key, j)
+    }
+    console.log(keyToNewIndexMap)
+
+    // 遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+    for (let j = s1; j <= e1; j++) {
+      const n1 = c1[j]
+      const newIndex = keyToNewIndexMap.get(n1.key)
+      // 如果有，则进行 patch
+      if (newIndex != null) {
+        patch(n1, c2[newIndex], container)
+      } else {
+        // 如果没有，则卸载
+        unmount(n1)
+      }
+    }
+  }
+}
+```
+
+![20250714162109](https://tuchuang.coder-sunshine.top/images/20250714162109.png)
+
+在这段代码中，声明了一个 `keyToNewIndexMap` 用来保存 `c2` 中 `key` 对应的 `index`，这样我们后续就可以快速的通过这个 `key` 找到对应的虚拟节点进行 `patch`，至此，该更新的就更新完了，但是目前顺序还是不对，我们需要遍历新的子节点，将每个子节点插入到正确的位置：
+
+```ts
+// 遍历新的，将每个子节点插入到正确的位置
+for (let j = e2; j >= s2; j--) {
+  /**
+   * 倒序插入
+   */
+  const n2 = c2[j]
+  const anchor = c2[j + 1]?.el || null
+  console.log(anchor)
+
+  // 依次进行倒序插入，保证顺序的一致性
+  hostInsert(n2.el, container, anchor)
+}
+```
+
+> [!WARNING] 注意
+> 这里需要注意的是需要倒序插入，因为只有 `insertBefore` 方法，也就是在指定节点之前插入，没有 `insertAfter` 方法
+
+![20250714165544](https://tuchuang.coder-sunshine.top/images/20250714165544.png)
+
+可以看到 锚点节点 分别为 `e b d`，是正确的。
+
+之前 `在遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载`
+
+但是 如果老的没有，新的有，这种情况还没有处理
+
+给vnode2 添加一个 `h('p', { key: 'f', style: { color: 'red' } }, 'f'),`
+
+![20250714165909](https://tuchuang.coder-sunshine.top/images/20250714165909.png)
+
+报错了，说 insertBefore 第一个参数不是一个节点类型，打印一下看看
+
+![20250714170531](https://tuchuang.coder-sunshine.top/images/20250714170531.png)
+
+可以看到 f 节点的 el 为 null，因为这里 n1 n2 都是数组，就走到了 全量 diff 里面，然后 f 节点 尾部对比 也没有对比上，就走了乱序 diff，乱序 diff 中可以发现 从始至终 f 节点都没有被 patch 过，所以这里 老的没有，新的有的，应该重新挂载一遍 才对。
+
+```ts
+// 遍历新的，将每个子节点插入到正确的位置
+for (let j = e2; j >= s2; j--) {
+  /**
+   * 倒序插入
+   */
+  const n2 = c2[j]
+  const anchor = c2[j + 1]?.el || null
+  console.log('anchor===>', anchor)
+  console.log('n2===>', n2)
+
+  if (n2.el) {
+    // 依次进行倒序插入，保证顺序的一致性
+    hostInsert(n2.el, container, anchor)
+  } else {
+    // 没有 el，说明是新节点，重新挂载就行了
+    patch(null, n2, container, anchor)
+  }
+}
+```
+
+![20250714171119](https://tuchuang.coder-sunshine.top/images/20250714171119.png)

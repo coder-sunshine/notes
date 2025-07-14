@@ -170,6 +170,55 @@ export function createRenderer(options) {
         unmount(c1[i])
         i++
       }
+    } else {
+      /**
+       * 乱序对比
+       */
+
+      // 老的子节点开始查找的位置
+      let s1 = i
+      // 新的子节点开始查找的位置
+      let s2 = i
+
+      // 需要一个映射表，遍历新的还没有更新的 也就是 s2 -> e2 的节点，建立一个映射表
+      // 然后遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+      const keyToNewIndexMap = new Map()
+
+      for (let j = s2; j <= e2; j++) {
+        const n2 = c2[j]
+        keyToNewIndexMap.set(n2.key, j)
+      }
+      console.log(keyToNewIndexMap)
+
+      // 遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+      for (let j = s1; j <= e1; j++) {
+        const n1 = c1[j]
+        const newIndex = keyToNewIndexMap.get(n1.key)
+        // 如果有，则进行 patch
+        if (newIndex != null) {
+          patch(n1, c2[newIndex], container)
+        } else {
+          // 如果没有，则卸载
+          unmount(n1)
+        }
+      }
+
+      /**
+       * 1. 遍历新的子元素，调整顺序，倒序插入
+       * 2. 新的有，老的没有的，我们需要重新挂载
+       */
+      for (let j = e2; j >= s2; j--) {
+        const n2 = c2[j]
+        const anchor = c2[j + 1]?.el || null
+
+        if (n2.el) {
+          // 依次进行倒序插入，保证顺序的一致性
+          hostInsert(n2.el, container, anchor)
+        } else {
+          // 没有 el，说明是新节点，重新挂载就行了
+          patch(null, n2, container, anchor)
+        }
+      }
     }
   }
 
