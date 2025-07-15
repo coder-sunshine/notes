@@ -113,13 +113,13 @@ export default class MyPromise<T = unknown> {
     )
   }
 
+  /**
+   * Promise.resolve() 静态方法以给定值“解决（resolve）”一个 Promise。
+   * 如果该值本身就是一个 Promise，那么该 Promise 将被返回；
+   * 如果该值是一个 thenable 对象，Promise.resolve() 将调用其 then() 方法及其两个回调函数；
+   * 否则，返回的 Promise 将会以该值兑现。
+   */
   static resolve<T>(value: T) {
-    /**
-     * Promise.resolve() 静态方法以给定值“解决（resolve）”一个 Promise。
-     * 如果该值本身就是一个 Promise，那么该 Promise 将被返回；
-     * 如果该值是一个 thenable 对象，Promise.resolve() 将调用其 then() 方法及其两个回调函数；
-     * 否则，返回的 Promise 将会以该值兑现。
-     */
     if (value instanceof Promise) {
       return value
     }
@@ -130,6 +130,15 @@ export default class MyPromise<T = unknown> {
       } else {
         resolve(value)
       }
+    })
+  }
+
+  /**
+   * Promise.reject() 静态方法返回一个以给定原因拒绝的 Promise。
+   */
+  static reject(reason: any) {
+    return new Promise((_, reject) => {
+      reject(reason)
     })
   }
 }

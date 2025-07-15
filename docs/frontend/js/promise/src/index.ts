@@ -90,18 +90,25 @@ console.log('end')
 //     console.log(err)
 //   })
 
-MyPromise.resolve(123).then(res => {
-  console.log(res)
-})
+// MyPromise.resolve(123).then(res => {
+//   console.log(res)
+// })
 
-MyPromise.resolve(new Promise(resolve => resolve(789))).then(res => {
-  console.log(res)
-})
+// MyPromise.resolve(new Promise(resolve => resolve(789))).then(res => {
+//   console.log(res)
+// })
 
-MyPromise.resolve({
-  then: (resolve: any, reject: any) => {
-    resolve('xxx')
-  },
-}).then(res => {
-  console.log(res)
-})
+// MyPromise.resolve({
+//   then: (resolve: any, reject: any) => {
+//     resolve('xxx')
+//   },
+// }).then(res => {
+//   console.log(res)
+// })
+
+MyPromise.reject(123).then(
+  null,
+  err => {
+    console.log(err)
+  }
+)
