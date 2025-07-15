@@ -94,4 +94,10 @@ export default class MyPromise<T = unknown> {
       this.runTasks()
     })
   }
+
+  catch(onRejected?: ((reason: any) => void) | null | undefined) {
+    console.log(onRejected)
+
+    return this.then(null, onRejected)
+  }
 }
