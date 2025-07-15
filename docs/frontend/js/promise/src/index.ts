@@ -75,11 +75,13 @@ console.log('end')
 //   }
 // )
 
-p1.catch().then(
-  res => {
+p1.catch()
+  .then(res => {
     console.log(res)
-  },
-  err => {
+  })
+  .finally(() => {
+    console.log('完成了')
+  })
+  .catch(err => {
     console.log(err)
-  }
-)
+  })

@@ -96,8 +96,20 @@ export default class MyPromise<T = unknown> {
   }
 
   catch(onRejected?: ((reason: any) => void) | null | undefined) {
-    console.log(onRejected)
-
     return this.then(null, onRejected)
+  }
+
+  finally(onFinally?: (() => void) | null | undefined) {
+    // finally 不接受参数，把参数返回，穿透给下一个 链式调用
+    return this.then(
+      value => {
+        onFinally?.()
+        return value
+      },
+      error => {
+        onFinally?.()
+        throw error
+      }
+    )
   }
 }
