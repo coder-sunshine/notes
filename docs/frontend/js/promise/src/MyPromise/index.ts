@@ -141,4 +141,11 @@ export default class MyPromise<T = unknown> {
       reject(reason)
     })
   }
+
+  static try(fn: (...args: any[]) => any, ...args: any[]) {
+    return new Promise(resolve => {
+      // 这里执行如果报错的话，会自动将错误信息 reject 出去，参考 constructor 中 executor 的执行
+      resolve(fn(...args))
+    })
+  }
 }

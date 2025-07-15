@@ -106,8 +106,28 @@ console.log('end')
 //   console.log(res)
 // })
 
-MyPromise.reject(123).then(
-  null,
+// MyPromise.reject(123).then(null, err => {
+//   console.log(err)
+// })
+
+function fn(a: number, b: number, c: number) {
+  throw new Error('报错啦')
+  return a + b + c
+}
+
+// Promise.resolve(fn(1, 2, 3))
+//   .then(res => {
+//     console.log(res)
+//   })
+//   .catch(err => {
+//     // 这样的话 在 catch 里面是捕获不到 fn报错的，但是我们也不能确定 fn 一定能调用成功,可以用 promise.try 来捕获
+//     console.log(err)
+//   })
+
+MyPromise.try(fn, 1, 2, 3).then(
+  res => {
+    console.log(res)
+  },
   err => {
     console.log(err)
   }
