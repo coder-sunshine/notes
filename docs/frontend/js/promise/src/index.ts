@@ -124,11 +124,19 @@ function fn(a: number, b: number, c: number) {
 //     console.log(err)
 //   })
 
-MyPromise.try(fn, 1, 2, 3).then(
-  res => {
+// MyPromise.try(fn, 1, 2, 3).then(
+//   res => {
+//     console.log(res)
+//   },
+//   err => {
+//     console.log(err)
+//   }
+// )
+
+MyPromise.all([Promise.resolve(0), Promise.reject(1), Promise.reject(2)])
+  .then(res => {
     console.log(res)
-  },
-  err => {
+  })
+  .catch(err => {
     console.log(err)
-  }
-)
+  })

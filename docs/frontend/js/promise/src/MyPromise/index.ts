@@ -148,4 +148,40 @@ export default class MyPromise<T = unknown> {
       resolve(fn(...args))
     })
   }
+
+  static all<T extends readonly unknown[] | []>(value: T) {
+    // 将 value 转化为数组
+    const promises = [...value]
+    // 返回 promise
+    return new MyPromise((resolve, reject) => {
+      // 声明一个数组，用来保存resolve 的结果
+      const results: T[] = []
+
+      // 数组长度为0 直接返回空数组
+      if (promises.length === 0) {
+        resolve([])
+      }
+
+      // 声明一个计数器，用来记录 执行的 promise 成功的 数量
+      let count = 0
+
+      // 遍历数组，执行每一个
+      promises.forEach((promise, index) => {
+        console.log(index)
+
+        // 将所有 promise 转为 Promise ，因为有可能 传递的 value 是 [1,2,promise] 这种
+        MyPromise.resolve(promise).then(res => {
+          // 将结果保存起来，如果全部成功，则 resolve 出去
+          results[index] = res
+          count++
+
+          if (count === promises.length) {
+            resolve(results)
+          }
+
+          // 失败的话直接执行 reject 就行了
+        }, reject)
+      })
+    })
+  }
 }
