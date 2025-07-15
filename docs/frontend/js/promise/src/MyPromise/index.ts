@@ -22,7 +22,7 @@ function runMicrotask(callback: () => void) {
   }
 }
 
-function isPromise(value: any) {
+function isPromiseLike(value: any) {
   return typeof value?.then === 'function'
 }
 
@@ -81,7 +81,7 @@ export default class MyPromise<T = unknown> {
           const cb = this.state === promiseState.FULFILLED ? onFulfilled : onRejected
           const res = typeof cb === 'function' ? cb?.(this.result) : this.result
 
-          if (isPromise(res)) {
+          if (isPromiseLike(res)) {
             ;(res as any).then(resolve, reject)
           } else {
             this.state === promiseState.FULFILLED ? resolve(res) : reject(res)
@@ -111,5 +111,25 @@ export default class MyPromise<T = unknown> {
         throw error
       }
     )
+  }
+
+  static resolve<T>(value: T) {
+    /**
+     * Promise.resolve() 静态方法以给定值“解决（resolve）”一个 Promise。
+     * 如果该值本身就是一个 Promise，那么该 Promise 将被返回；
+     * 如果该值是一个 thenable 对象，Promise.resolve() 将调用其 then() 方法及其两个回调函数；
+     * 否则，返回的 Promise 将会以该值兑现。
+     */
+    if (value instanceof Promise) {
+      return value
+    }
+
+    return new Promise((resolve, reject) => {
+      if (isPromiseLike(value)) {
+        ;(value as any).then(resolve, reject)
+      } else {
+        resolve(value)
+      }
+    })
   }
 }

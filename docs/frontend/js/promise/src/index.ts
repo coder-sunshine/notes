@@ -17,6 +17,10 @@ const p1 = new MyPromise<number>((resolve, reject) => {
   // }, 1000)
 })
 
+const p2 = new Promise((resolve, reject) => {
+  resolve(123)
+})
+
 console.log(p1)
 
 // p1.then(
@@ -75,13 +79,29 @@ console.log('end')
 //   }
 // )
 
-p1.catch()
-  .then(res => {
-    console.log(res)
-  })
-  .finally(() => {
-    console.log('完成了')
-  })
-  .catch(err => {
-    console.log(err)
-  })
+// p1.catch()
+//   .then(res => {
+//     console.log(res)
+//   })
+//   .finally(() => {
+//     console.log('完成了')
+//   })
+//   .catch(err => {
+//     console.log(err)
+//   })
+
+MyPromise.resolve(123).then(res => {
+  console.log(res)
+})
+
+MyPromise.resolve(new Promise(resolve => resolve(789))).then(res => {
+  console.log(res)
+})
+
+MyPromise.resolve({
+  then: (resolve: any, reject: any) => {
+    resolve('xxx')
+  },
+}).then(res => {
+  console.log(res)
+})
