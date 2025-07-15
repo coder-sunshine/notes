@@ -10,6 +10,8 @@ export default class MyPromise<T = unknown> {
   private state: PromiseState = promiseState.PENDING
   private result: T | undefined = undefined
 
+  private handlers: (() => void)[] = []
+
   constructor(executor: (resolve: (value: T) => void, reject: (reason: any) => void) => void) {
     try {
       executor(this.resolve.bind(this), this.reject.bind(this))
@@ -32,5 +34,34 @@ export default class MyPromise<T = unknown> {
     if (this.state !== promiseState.PENDING) return
     this.result = result
     this.state = state
+
+    this.runTasks()
+  }
+
+  private runTasks() {
+    if (this.state !== promiseState.PENDING) {
+      this.handlers.forEach(cb => cb())
+      this.handlers = []
+    }
+  }
+
+  then(onFulfilled?: ((value: T | undefined) => void) | null | undefined, onRejected?: (reason: any) => void) {
+    // 支持链式调用，但是这里不能返回 this,因为 this是之前的 实例，状态已经被定下来了，不能再改变了。
+    // 在链式调用里面是可以处理新的 promise状态的。所以需要返回一个全新的 promise 实例
+    return new MyPromise((resolve, reject) => {
+      // pending 状态，需要将 onFulfilled 和 onRejected 函数保存起来，等到状态改变时，再执行
+
+      this.handlers.push(() => {
+        try {
+          const cb = this.state === promiseState.FULFILLED ? onFulfilled : onRejected
+          const res = typeof cb === 'function' ? cb?.(this.result) : this.result
+          resolve(res)
+        } catch (error) {
+          reject(error)
+        }
+      })
+
+      this.runTasks()
+    })
   }
 }
