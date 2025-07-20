@@ -1893,3 +1893,80 @@ setTimeout(() => {
 ![20250720160532](https://tuchuang.coder-sunshine.top/images/20250720160532.png)
 
 更新也成功了
+
+### vnode 拓展
+
+```js
+import { h, render, Text } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+// 创建一个 div, 第三个参数，传一个字符传的数组
+const vnode1 = h('div', null, ['hello', 'world'])
+console.log(vnode1)
+```
+
+render 之前
+
+![20250720161201](https://tuchuang.coder-sunshine.top/images/20250720161201.png)
+
+```js
+const vnode1 = h('div', null, ['hello', 'world'])
+render(vnode1, app)
+console.log(vnode1)
+```
+
+render 之后在打印
+
+![20250720161255](https://tuchuang.coder-sunshine.top/images/20250720161255.png)
+
+可以看到这里帮我们把 `['hello', 'world']` 变成了两个文本节点，创建的时候没有处理，在挂载的时候处理的
+
+```js
+import { h, render, Text } from '../dist/vue.esm.js'
+
+const vnode1 = h('div', null, ['hello', 'world'])
+render(vnode1, app)
+console.log(vnode1)
+```
+
+![20250720161430](https://tuchuang.coder-sunshine.top/images/20250720161430.png)
+
+使用我们自己的根本创建不出来节点，因为创建节点的地方都不满足
+
+![20250720161922](https://tuchuang.coder-sunshine.top/images/20250720161922.png)
+
+所以需要再创建子元素之前把这种情况转化为 `Text` 处理，写一个 `normalizeVNode` 函数，标准化处理
+
+```ts
+// vnode.ts
+
+/**
+ * 标准化处理
+ * @param vnode 虚拟节点
+ * @returns 标准化后的虚拟节点
+ */
+export function normalizeVNode(vnode) {
+  if (isString(vnode) || isNumber(vnode)) {
+    // 如果是 string 或者 number 转换成文本节点
+
+    return createVNode(Text, null, String(vnode))
+  }
+
+  return vnode
+}
+```
+
+```ts
+// 挂载子元素
+const mountChildren = (children, container) => {
+  for (let i = 0; i < children.length; i++) {
+    // 递归挂载子节点
+    // n1 为 null，表示直接挂载
+    // 进行标准化 vnode
+    patch(null, (children[i] = normalizeVNode(children[i])), container)
+  }
+}
+```
+
+![20250720162509](https://tuchuang.coder-sunshine.top/images/20250720162509.png)
+
+这样就成功挂载了

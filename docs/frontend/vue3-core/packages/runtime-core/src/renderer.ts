@@ -1,5 +1,5 @@
 import { ShapeFlags } from '@vue/shared'
-import { isSameVNodeType, Text } from './vnode'
+import { isSameVNodeType, normalizeVNode, Text } from './vnode'
 
 export function createRenderer(options) {
   // 拿到 nodeOps 里面的操作 Dom 方法
@@ -40,7 +40,8 @@ export function createRenderer(options) {
     for (let i = 0; i < children.length; i++) {
       // 递归挂载子节点
       // n1 为 null，表示直接挂载
-      patch(null, children[i], container)
+      // 进行标准化 vnode
+      patch(null, (children[i] = normalizeVNode(children[i])), container)
     }
   }
 
@@ -398,14 +399,6 @@ export function createRenderer(options) {
       // 把 n1 设置为 null, 那么走到下面判断 就是走挂载新的逻辑
       n1 = null
     }
-
-    // if (n1 == null) {
-    //   // 挂载新的
-    //   mountElement(n2, container, anchor)
-    // } else {
-    //   // 更新
-    //   patchElement(n1, n2)
-    // }
 
     /**
      * 文本，元素，组件
