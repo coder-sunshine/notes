@@ -212,6 +212,7 @@ export function createRenderer(options) {
         const anchor = c2[j + 1]?.el || null
 
         if (n2.el) {
+          debugger
           // 依次进行倒序插入，保证顺序的一致性
           hostInsert(n2.el, container, anchor)
         } else {
@@ -360,4 +361,87 @@ export function createRenderer(options) {
   return {
     render,
   }
+}
+
+/**
+ * 获取最长递增子序列
+ * @param arr 数组
+ * @returns 最长递增子序列的索引
+ */
+function getSequence(arr) {
+  // 记录结果数组，存的是索引
+  const result = []
+
+  // 记录前驱节点
+  const map = new Map()
+
+  for (let i = 0; i < arr.length; i++) {
+    const item = arr[i]
+
+    if (result.length === 0) {
+      // 如果 result 一个都没有，就把当前的索引放进去，第一个也不用记录前驱节点
+      result.push(i)
+      continue
+    }
+
+    // 拿到最后一个索引
+    const lastIndex = result[result.length - 1]
+    // 拿到最后一个元素
+    const lastItem = arr[lastIndex]
+
+    // 当前元素大于最后一个元素
+    if (item > lastItem) {
+      // 直接 push ，并且记录 当前 i 的前驱节点
+      result.push(i)
+      map.set(i, lastIndex)
+      continue
+    }
+
+    // 此时需要找到第一个比自己大的数，并且替换 --> 二分查找
+    console.log('result', result)
+
+    let left = 0
+    let right = result.length - 1
+
+    /**
+     * 需要找到第一个比当前值大的值
+     * 如果中间值小于当前值，那么第一个比当前值大的肯定在右边
+     * 如果中间值大于当前值，那么第一个比当前值大的肯定在左边
+     */
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2)
+      const midItem = arr[result[mid]]
+
+      if (midItem < item) {
+        left = mid + 1
+      } else {
+        right = mid
+      }
+    }
+
+    if (arr[result[left]] > item) {
+      // 第一个不用记录前驱节点
+      if (left > 0) {
+        // 记录前驱节点
+        map.set(i, result[left - 1])
+      }
+      // 找到最合适的，把索引替换进去
+      result[left] = i
+    }
+  }
+
+  // 反向追溯
+  let l = result.length
+
+  let last = result[l - 1]
+
+  while (l > 0) {
+    l--
+    // 纠正顺序
+    result[l] = last
+    // 下一次的last等于当前last记录的前驱节点
+    last = map.get(last)
+  }
+
+  return result
 }
