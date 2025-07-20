@@ -1543,3 +1543,182 @@ console.log(getSequence([10, 3, 5, 9, 12, 8, 15, 18]))
 ![20250720100722](https://tuchuang.coder-sunshine.top/images/20250720100722.png)
 
 这里打印的是 `[ 1, 2, 3, 4, 6, 7 ]`，因为我们需要的就是索引,`[3, 5, 9, 12, 15, 18]` 对应索引就是`[ 1, 2, 3, 4, 6, 7 ]`，也就是最长递增子序列。
+
+接下来就需要把新节点，和老节点的对应关系给找出来，然后求最长递增子序列。
+
+接着还是看之前的例子 `[a,b,c,d,e]` -> `[a,c,d,b,e]`
+
+在`乱序diff`的时候,创建一个新的数组，用来存储新老节点索引的对应关系
+
+![20250720104822](https://tuchuang.coder-sunshine.top/images/20250720104822.png)
+
+![20250720104839](https://tuchuang.coder-sunshine.top/images/20250720104839.png)
+
+新的是 1 2 3，对应到老的就是 2 3 1，这里多了个 -1，也就是不需要计算的，在算的时候需要过滤掉。
+
+![20250720105253](https://tuchuang.coder-sunshine.top/images/20250720105253.png)
+
+![20250720105556](https://tuchuang.coder-sunshine.top/images/20250720105556.png)
+
+![20250720105440](https://tuchuang.coder-sunshine.top/images/20250720105440.png)
+
+算出来的 newIndexSequence 是 `[1,2]`，也就是代表 新的子节点 下标为 `1` 和 `2` 的是不需要动的。接下来在纠正顺序的时候判断就行了
+
+![20250720110615](https://tuchuang.coder-sunshine.top/images/20250720110615.png)
+
+![20250720110835](https://tuchuang.coder-sunshine.top/images/20250720110835.png)
+
+![20250720111559](https://tuchuang.coder-sunshine.top/images/20250720111559.png)
+
+这样就只需要移动一次 `b` 就行了。
+
+![20250720111732](https://tuchuang.coder-sunshine.top/images/20250720111732.png)
+
+```js
+// c1 => [a, b, c, d, e]
+const vnode1 = h('div', [
+  h('p', { key: 'a', style: { color: 'blue' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'blue' } }, 'b'),
+  h('p', { key: 'c', style: { color: 'blue' } }, 'c'),
+  h('p', { key: 'd', style: { color: 'blue' } }, 'd'),
+  h('p', { key: 'e', style: { color: 'blue' } }, 'e'),
+])
+
+// c2 => [a, b, c, e, d]
+const vnode2 = h('div', [
+  h('p', { key: 'a', style: { color: 'red' } }, 'a'),
+  h('p', { key: 'b', style: { color: 'red' } }, 'b'),
+  h('p', { key: 'c', style: { color: 'red' } }, 'c'),
+  h('p', { key: 'e', style: { color: 'red' } }, 'e'),
+  h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+  // h('p', { key: 'f', style: { color: 'red' } }, 'f'),
+])
+
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+换一组数据测试下
+
+![20250720112450](https://tuchuang.coder-sunshine.top/images/20250720112450.png)
+
+可以看到这里多了个 `empty` ，`e2`是`4`, `s2`是`3`，长度就是 2 ,两个 -1 是正常的，这里的 empty 是因为在设置的时候，超过了
+
+![20250720112711](https://tuchuang.coder-sunshine.top/images/20250720112711.png)
+
+这里 newIndex 不会出现2，因为 a,b,c 前面三个相等，虽然对结果没影响，还是可以处理下，减少运算
+
+![20250720112844](https://tuchuang.coder-sunshine.top/images/20250720112844.png)
+
+还有一种情况 `[a, b, c, d, e]` --> `[a, q, b, c, d, f, e]`
+
+这种情况双端 `diff` 后，就是 `b,c,d` 和 `q,b,c,d,f` 比较，其实可以一眼看出来这里 `b,c,d` 是最长递增子序列，也就是只需要将 `q` 和 `f` 插入就行了，顺序根本就不需要变化。
+
+可以定义一个变量 `pos` 和 `moved`， 在进行遍历的时候判断，是否每次遍历的 `newIndex` 是否大于 `pos`，都大于的话，代表是连续递增，就不需要移动了。
+
+![20250720122851](https://tuchuang.coder-sunshine.top/images/20250720122851.png)
+
+![20250720123015](https://tuchuang.coder-sunshine.top/images/20250720123015.png)
+
+```ts
+// 乱序部分代码
+
+const patchKeyedChildren = (c1, c2, container) => {
+  // ...
+
+  /**
+   * 乱序对比
+   */
+
+  // 老的子节点开始查找的位置
+  let s1 = i
+  // 新的子节点开始查找的位置
+  let s2 = i
+
+  // 需要一个映射表，遍历新的还没有更新的 也就是 s2 -> e2 的节点，建立一个映射表
+  // 然后遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+  const keyToNewIndexMap = new Map()
+  console.log(e2, s2)
+
+  // 存储新的子节点在老的子节点中的索引,必须是老的和新的都有的才需要记录
+  const newIndexToOldIndexMap = new Array(e2 - s2 + 1)
+
+  // 如果是 -1，代表不需要计算的，有可能是新增的，新的有老的没有。
+  newIndexToOldIndexMap.fill(-1)
+
+  for (let j = s2; j <= e2; j++) {
+    const n2 = c2[j]
+    keyToNewIndexMap.set(n2.key, j)
+  }
+
+  let pos = -1
+  // 是否需要移动
+  let moved = false
+
+  // 遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
+  for (let j = s1; j <= e1; j++) {
+    const n1 = c1[j]
+    const newIndex = keyToNewIndexMap.get(n1.key)
+    console.log('newIndex', newIndex)
+
+    // 如果有，则进行 patch
+    if (newIndex != null) {
+      // 如果每一次都是比上一次的大，表示就是连续递增的，不需要算
+      if (newIndex > pos) {
+        pos = newIndex
+      } else {
+        // 如果突然比上一次的小了，就表示需要移动了
+        moved = true
+      }
+
+      // 新的有， 老的也有。
+      newIndexToOldIndexMap[newIndex] = j
+
+      patch(n1, c2[newIndex], container)
+    } else {
+      // 如果没有，则卸载
+      unmount(n1)
+    }
+  }
+
+  console.log('newIndexToOldIndexMap', newIndexToOldIndexMap)
+
+  // 如果 moved 为 false，表示不需要移动，就不需要算最长递增子序列
+  const newIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : []
+
+  // 用 set 判断，性能更好点
+  const sequenceSet = new Set(newIndexSequence)
+
+  console.log('newIndexSequence', newIndexSequence)
+
+  /**
+   * 1. 遍历新的子元素，调整顺序，倒序插入
+   * 2. 新的有，老的没有的，我们需要重新挂载
+   */
+  for (let j = e2; j >= s2; j--) {
+    const n2 = c2[j]
+    const anchor = c2[j + 1]?.el || null
+
+    if (n2.el) {
+      // 需要移动，再进去判断
+      if (moved) {
+        // 如果不在最长递增子序列，表示需要移动。
+        if (!sequenceSet.has(j)) {
+          // 依次进行倒序插入，保证顺序的一致性
+          hostInsert(n2.el, container, anchor)
+        }
+      }
+    } else {
+      // 没有 el，说明是新节点，重新挂载就行了
+      patch(null, n2, container, anchor)
+    }
+  }
+}
+```
+
+> [!IMPORTANT] 总结 ：
+> 求出来最长递增子序列，就是为了减少 dom 的移动次数，需要注意的是类似于 从 `[a, b, c, d, e]` --> `[a, q, b, c, d, f, e]` 本来就是连续递增的就不需要去计算最长递增子序列了

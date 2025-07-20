@@ -22,14 +22,16 @@
         h('p', { key: 'e', style: { color: 'blue' } }, 'e'),
       ])
 
-      // c2 => [a, c, d, b, e, f]
+      // c2 => [a, b, c, e, d]
       const vnode2 = h('div', [
         h('p', { key: 'a', style: { color: 'red' } }, 'a'),
-        h('p', { key: 'c', style: { color: 'red' } }, 'c'),
-        h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+        h('p', { key: 'q', style: { color: 'red' } }, 'q'),
         h('p', { key: 'b', style: { color: 'red' } }, 'b'),
+        h('p', { key: 'c', style: { color: 'red' } }, 'c'),
         h('p', { key: 'e', style: { color: 'red' } }, 'e'),
         h('p', { key: 'f', style: { color: 'red' } }, 'f'),
+        h('p', { key: 'd', style: { color: 'red' } }, 'd'),
+        // h('p', { key: 'f', style: { color: 'red' } }, 'f'),
       ])
 
       render(vnode1, app)

@@ -183,25 +183,58 @@ export function createRenderer(options) {
       // 需要一个映射表，遍历新的还没有更新的 也就是 s2 -> e2 的节点，建立一个映射表
       // 然后遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
       const keyToNewIndexMap = new Map()
+      console.log(e2, s2)
+
+      // 存储新的子节点在老的子节点中的索引,必须是老的和新的都有的才需要记录
+      const newIndexToOldIndexMap = new Array(e2 - s2 + 1)
+
+      // 如果是 -1，代表不需要计算的，有可能是新增的，新的有老的没有。
+      newIndexToOldIndexMap.fill(-1)
 
       for (let j = s2; j <= e2; j++) {
         const n2 = c2[j]
         keyToNewIndexMap.set(n2.key, j)
       }
-      console.log(keyToNewIndexMap)
+
+      let pos = -1
+      // 是否需要移动
+      let moved = false
 
       // 遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
       for (let j = s1; j <= e1; j++) {
         const n1 = c1[j]
         const newIndex = keyToNewIndexMap.get(n1.key)
+        console.log('newIndex', newIndex)
+
         // 如果有，则进行 patch
         if (newIndex != null) {
+          // 如果每一次都是比上一次的大，表示就是连续递增的，不需要算
+          if (newIndex > pos) {
+            pos = newIndex
+          } else {
+            // 如果突然比上一次的小了，就表示需要移动了
+            moved = true
+          }
+
+          // 新的有， 老的也有。
+          newIndexToOldIndexMap[newIndex] = j
+
           patch(n1, c2[newIndex], container)
         } else {
           // 如果没有，则卸载
           unmount(n1)
         }
       }
+
+      console.log('newIndexToOldIndexMap', newIndexToOldIndexMap)
+
+      // 如果 moved 为 false，表示不需要移动，就不需要算最长递增子序列
+      const newIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : []
+
+      // 用 set 判断，性能更好点
+      const sequenceSet = new Set(newIndexSequence)
+
+      console.log('newIndexSequence', newIndexSequence)
 
       /**
        * 1. 遍历新的子元素，调整顺序，倒序插入
@@ -212,9 +245,14 @@ export function createRenderer(options) {
         const anchor = c2[j + 1]?.el || null
 
         if (n2.el) {
-          debugger
-          // 依次进行倒序插入，保证顺序的一致性
-          hostInsert(n2.el, container, anchor)
+          // 需要移动，再进去判断
+          if (moved) {
+            // 如果不在最长递增子序列，表示需要移动。
+            if (!sequenceSet.has(j)) {
+              // 依次进行倒序插入，保证顺序的一致性
+              hostInsert(n2.el, container, anchor)
+            }
+          }
         } else {
           // 没有 el，说明是新节点，重新挂载就行了
           patch(null, n2, container, anchor)
@@ -377,6 +415,9 @@ function getSequence(arr) {
 
   for (let i = 0; i < arr.length; i++) {
     const item = arr[i]
+
+    // 如果是 -1，或者是 Undefined 代表不需要计算的
+    if (item === -1 || item === undefined) continue
 
     if (result.length === 0) {
       // 如果 result 一个都没有，就把当前的索引放进去，第一个也不用记录前驱节点
