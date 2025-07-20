@@ -44,7 +44,7 @@ export function isVNode(value) {
  * @param children 子节点
  */
 export function createVNode(type, props?, children = null) {
-  let shapeFlag
+  let shapeFlag = 0
 
   if (isString(type)) {
     shapeFlag = ShapeFlags.ELEMENT

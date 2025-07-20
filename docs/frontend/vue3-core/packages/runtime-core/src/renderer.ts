@@ -112,7 +112,7 @@ export function createRenderer(options) {
     // 1. 头部对比
     while (i <= e1 && i <= e2) {
       const n1 = c1[i]
-      const n2 = c2[i]
+      const n2 = (c2[i] = normalizeVNode(c2[i]))
 
       // 如果是相同类型，则直接 patch 对比
       if (isSameVNodeType(n1, n2)) {
@@ -134,7 +134,7 @@ export function createRenderer(options) {
     //  尾部对比
     while (i <= e1 && i <= e2) {
       const n1 = c1[e1]
-      const n2 = c2[e2]
+      const n2 = (c2[e2] = normalizeVNode(c2[e2]))
 
       // 如果是相同类型，则直接 patch 对比
       if (isSameVNodeType(n1, n2)) {
@@ -146,7 +146,6 @@ export function createRenderer(options) {
       e1--
       e2--
     }
-    console.log(i, e1, e2)
 
     if (i > e1) {
       /**
@@ -156,10 +155,9 @@ export function createRenderer(options) {
       const nextPos = e2 + 1
 
       const anchor = nextPos < c2.length ? c2[nextPos].el : null
-      console.log(anchor)
 
       while (i <= e2) {
-        patch(null, c2[i], container, anchor)
+        patch(null, (c2[i] = normalizeVNode(c2[i])), container, anchor)
         i++
       }
     } else if (i > e2) {
@@ -184,7 +182,6 @@ export function createRenderer(options) {
       // 需要一个映射表，遍历新的还没有更新的 也就是 s2 -> e2 的节点，建立一个映射表
       // 然后遍历老的，看看老的节点是否在新的映射表中，如果在，则进行 patch，如果不在，则卸载
       const keyToNewIndexMap = new Map()
-      console.log(e2, s2)
 
       // 存储新的子节点在老的子节点中的索引,必须是老的和新的都有的才需要记录
       const newIndexToOldIndexMap = new Array(e2 - s2 + 1)
@@ -193,7 +190,7 @@ export function createRenderer(options) {
       newIndexToOldIndexMap.fill(-1)
 
       for (let j = s2; j <= e2; j++) {
-        const n2 = c2[j]
+        const n2 = (c2[j] = normalizeVNode(c2[j]))
         keyToNewIndexMap.set(n2.key, j)
       }
 
@@ -205,7 +202,6 @@ export function createRenderer(options) {
       for (let j = s1; j <= e1; j++) {
         const n1 = c1[j]
         const newIndex = keyToNewIndexMap.get(n1.key)
-        console.log('newIndex', newIndex)
 
         // 如果有，则进行 patch
         if (newIndex != null) {
@@ -227,15 +223,11 @@ export function createRenderer(options) {
         }
       }
 
-      console.log('newIndexToOldIndexMap', newIndexToOldIndexMap)
-
       // 如果 moved 为 false，表示不需要移动，就不需要算最长递增子序列
       const newIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : []
 
       // 用 set 判断，性能更好点
       const sequenceSet = new Set(newIndexSequence)
-
-      console.log('newIndexSequence', newIndexSequence)
 
       /**
        * 1. 遍历新的子元素，调整顺序，倒序插入
@@ -487,7 +479,6 @@ function getSequence(arr) {
     }
 
     // 此时需要找到第一个比自己大的数，并且替换 --> 二分查找
-    console.log('result', result)
 
     let left = 0
     let right = result.length - 1

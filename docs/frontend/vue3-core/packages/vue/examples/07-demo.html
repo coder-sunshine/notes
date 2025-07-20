@@ -14,16 +14,13 @@
       import { h, render, Text } from '../dist/vue.esm.js'
 
       const vnode1 = h('div', null, ['hello', 'world'])
-      // console.log(vnode1)
-
-      // const vnode2 = h(Text, null, 'world')
-
+      const vnode2 = h('div', null, ['world', 'hello'])
       render(vnode1, app)
-      console.log(vnode1)
-      // setTimeout(() => {
-      //   console.log('定时器执行了')
-      //   render(vnode2, app)
-      // }, 2000)
+
+      setTimeout(() => {
+        console.log('定时器执行了')
+        render(vnode2, app)
+      }, 2000)
     </script>
   </body>
 </html>

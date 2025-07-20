@@ -1969,4 +1969,38 @@ const mountChildren = (children, container) => {
 
 ![20250720162509](https://tuchuang.coder-sunshine.top/images/20250720162509.png)
 
-这样就成功挂载了
+这样就成功挂载了，接下来处理更新，目前更新是肯定不行的
+
+```js
+import { h, render, Text } from '../dist/vue.esm.js'
+
+const vnode1 = h('div', null, ['hello', 'world'])
+const vnode2 = h('div', null, ['world', 'hello'])
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+![20250720162735](https://tuchuang.coder-sunshine.top/images/20250720162735.png)
+
+可以看到 当定时器执行后，什么都没了页面上，分析一下，这里都是相同的类型，且都是数组，那么应该走到 diff 算法里面，
+
+![20250720163214](https://tuchuang.coder-sunshine.top/images/20250720163214.png)
+
+这里类型都不一样了。但是这里应该是一样的，只需要把 新节点标准化处理下就行了。
+
+![20250720163337](https://tuchuang.coder-sunshine.top/images/20250720163337.png)
+
+> [!TIP] 分析：
+> 头部处理好了，那么尾部对比也需要处理,对比完后老的少新的多，需要挂载，挂载的时候，也需要处理，以及乱序 diff 时候遍历新的时候也需要标准化处理
+
+如下图:
+
+![20250720163729](https://tuchuang.coder-sunshine.top/images/20250720163729.png)
+
+![20250720163822](https://tuchuang.coder-sunshine.top/images/20250720163822.png)
+
+![20250720163834](https://tuchuang.coder-sunshine.top/images/20250720163834.png)
