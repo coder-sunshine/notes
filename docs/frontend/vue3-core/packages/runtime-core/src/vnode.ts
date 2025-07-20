@@ -1,6 +1,11 @@
 import { isArray, isString, ShapeFlags } from '@vue/shared'
 
 /**
+ * 文本节点标记
+ */
+export const Text = Symbol('v-txt')
+
+/**
  * 判断两个虚拟节点是否是同一个类型
  * @param n1 老节点
  * @param n2 新节点

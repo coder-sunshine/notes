@@ -1,5 +1,5 @@
 import { ShapeFlags } from '@vue/shared'
-import { isSameVNodeType } from './vnode'
+import { isSameVNodeType, Text } from './vnode'
 
 export function createRenderer(options) {
   // 拿到 nodeOps 里面的操作 Dom 方法
@@ -343,6 +343,41 @@ export function createRenderer(options) {
   }
 
   /**
+   * 处理元素的挂载和更新
+   */
+  const processElement = (n1, n2, container, anchor) => {
+    if (n1 == null) {
+      // 挂载
+      mountElement(n2, container, anchor)
+    } else {
+      // 更新
+      patchElement(n1, n2)
+    }
+  }
+
+  /**
+   * 处理文本的挂载和更新
+   */
+  const processText = (n1, n2, container, anchor) => {
+    if (n1 == null) {
+      // 挂载
+      const el = hostCreateText(n2.children)
+      // 给 vnode 绑定 el
+      n2.el = el
+      // 把文本节点插入到 container 中
+      hostInsert(el, container, anchor)
+    } else {
+      // 更新
+      // 复用节点
+      n2.el = n1.el
+      if (n1.children != n2.children) {
+        // 如果文本内容变了，就更新
+        hostSetText(n2.el, n2.children)
+      }
+    }
+  }
+
+  /**
    * 更新和挂载，都用这个函数
    * @param n1 老节点，之前的，如果有，表示要跟 n2 做 diff，更新，如果没有，表示直接挂载 n2
    * @param n2 新节点
@@ -364,12 +399,32 @@ export function createRenderer(options) {
       n1 = null
     }
 
-    if (n1 == null) {
-      // 挂载新的
-      mountElement(n2, container, anchor)
-    } else {
-      // 更新
-      patchElement(n1, n2)
+    // if (n1 == null) {
+    //   // 挂载新的
+    //   mountElement(n2, container, anchor)
+    // } else {
+    //   // 更新
+    //   patchElement(n1, n2)
+    // }
+
+    /**
+     * 文本，元素，组件
+     */
+
+    const { shapeFlag, type } = n2
+
+    switch (type) {
+      // 处理文本节点
+      case Text:
+        processText(n1, n2, container, anchor)
+        break
+      default:
+        if (shapeFlag & ShapeFlags.ELEMENT) {
+          // 处理 dom 元素 div span p h1
+          processElement(n1, n2, container, anchor)
+        } else if (shapeFlag & ShapeFlags.COMPONENT) {
+          // TODO 组件
+        }
     }
   }
   // 提供虚拟节点 渲染到页面上的功能

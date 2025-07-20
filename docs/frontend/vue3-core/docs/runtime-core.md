@@ -1722,3 +1722,174 @@ const patchKeyedChildren = (c1, c2, container) => {
 
 > [!IMPORTANT] 总结 ：
 > 求出来最长递增子序列，就是为了减少 dom 的移动次数，需要注意的是类似于 从 `[a, b, c, d, e]` --> `[a, q, b, c, d, f, e]` 本来就是连续递增的就不需要去计算最长递增子序列了
+
+### Text 文本节点
+
+之前一直是使用虚拟 `DOM` 创建某一个元素节点，渲染到页面中，其实 `vue` 还支持渲染文本节点，简单来说就是将一个**文本节点**渲染到真实 `DOM` 中，我们来看一下怎么使用的：
+
+```js
+import { h, render, Text } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+// import { h, render } from '../dist/vue.esm.js'
+
+const vnode1 = h(Text, null, 'hello')
+
+const vnode2 = h(Text, null, 'world')
+
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+![20250720154344](https://tuchuang.coder-sunshine.top/images/20250720154344.png)
+
+![20250720154352](https://tuchuang.coder-sunshine.top/images/20250720154352.png)
+
+接下来实现我们的 `Text`，先在 `vnode` 文件中创建一个 `Text` 标记
+
+```ts
+/**
+ * 文本节点标记
+ */
+export const Text = Symbol('v-txt')
+```
+
+```js
+// import { h, render, Text } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+import { h, render, Text } from '../dist/vue.esm.js'
+
+const vnode1 = h(Text, null, 'hello')
+
+const vnode2 = h(Text, null, 'world')
+
+render(vnode1, app)
+
+// setTimeout(() => {
+//   console.log('定时器执行了')
+//   render(vnode2, app)
+// }, 2000)
+```
+
+![20250720154838](https://tuchuang.coder-sunshine.top/images/20250720154838.png)
+
+使用我们自己的 `Text`节点 直接报错了，因为在节点挂载的时候,传给 `hostCreateElement` 的 `type` 值是 `Symbol(v-txt)`，所以这里需要处理，在调用 `mountElement` 挂载函数之前就先把元素节点类型处理好。
+
+修改 `patch` 函数
+
+```ts
+const patch = (n1, n2, container, anchor = null) => {
+  // 如果 n1 和 n2 一样，则不需要做任何操作
+  if (n1 === n2) {
+    return
+  }
+
+  // 如果两个节点类型不一样，则直接销毁老的，创建新的
+  if (n1 && !isSameVNodeType(n1, n2)) {
+    // 比如说 n1 是 div ，n2 是 span，这俩就不一样，或者 n1 的 key 是1，n2 的 key 是 2，也不一样，都要卸载掉 n1
+    // 如果两个节点不是同一个类型，那就卸载 n1 直接挂载 n2
+    unmount(n1)
+    // 把 n1 设置为 null, 那么走到下面判断 就是走挂载新的逻辑
+    n1 = null
+  }
+
+  // if (n1 == null) {
+  //   // 挂载新的
+  //   mountElement(n2, container, anchor)
+  // } else {
+  //   // 更新
+  //   patchElement(n1, n2)
+  // }
+
+  /**
+   * 文本，元素，组件
+   */
+
+  const { shapeFlag, type } = n2
+
+  switch (type) {
+    // 处理文本节点
+    case Text:
+      processText(n2, container)
+      break
+    default:
+      if (shapeFlag & ShapeFlags.ELEMENT) {
+        // 处理 dom 元素 div span p h1
+        processElement(n1, n2, container, anchor)
+      } else if (shapeFlag & ShapeFlags.COMPONENT) {
+        // TODO 组件
+      }
+  }
+}
+```
+
+将原来的挂载和更新逻辑抽离出来，分成根据 type 的类型来处理。
+
+```ts
+// processElement 就是原来被注释的逻辑
+
+/**
+ * 处理元素的挂载和更新
+ */
+const processElement = (n1, n2, container, anchor) => {
+  if (n1 == null) {
+    // 挂载
+    mountElement(n2, container, anchor)
+  } else {
+    // 更新
+    patchElement(n1, n2)
+  }
+}
+```
+
+```ts
+// processText 和 processElement 逻辑差不多
+
+/**
+ * 处理文本的挂载和更新
+ */
+const processText = (n1, n2, container, anchor) => {
+  if (n1 == null) {
+    // 挂载
+    const el = hostCreateText(n2.children)
+    // 给 vnode 绑定 el
+    n2.el = el
+    // 把文本节点插入到 container 中
+    hostInsert(el, container, anchor)
+  } else {
+    // 更新
+    // 复用节点
+    n2.el = n1.el
+    if (n1.children != n2.children) {
+      // 如果文本内容变了，就更新
+      hostSetText(n2.el, n2.children)
+    }
+  }
+}
+```
+
+![20250720160502](https://tuchuang.coder-sunshine.top/images/20250720160502.png)
+
+这样就成功挂载了，试试更新
+
+```js
+import { h, render, Text } from '../dist/vue.esm.js'
+
+const vnode1 = h(Text, null, 'hello')
+
+const vnode2 = h(Text, null, 'world')
+
+render(vnode1, app)
+
+setTimeout(() => {
+  console.log('定时器执行了')
+  render(vnode2, app)
+}, 2000)
+```
+
+![20250720160532](https://tuchuang.coder-sunshine.top/images/20250720160532.png)
+
+更新也成功了
