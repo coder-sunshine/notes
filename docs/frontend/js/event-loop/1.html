@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <h1 id="h1">h1的文本信息</h1>
+    <button id="btn">change</button>
+
+    <script>
+      // 死循环指定的时间
+      function delay(duration) {
+        console.log('delay开始执行')
+        var start = Date.now()
+        while (Date.now() - start < duration) {}
+        console.log('delay结束执行')
+      }
+
+      btn.onclick = function () {
+        console.log('点击事件开始执行')
+        h1.textContent = '修改h1的内容'
+        delay(3000)
+      }
+    </script>
+  </body>
+</html>

@@ -28,6 +28,7 @@ export default defineConfig({
       {
         text: '前端',
         items: [
+          { text: 'javaScript', link: '/docs/frontend/js/event-loop/index.md' },
           { text: 'Vue3源码', link: '/docs/frontend/vue3-core/docs/index.md' },
           {
             text: 'React',
@@ -82,6 +83,16 @@ export default defineConfig({
         {
           text: '核心运行时 runtime-core',
           link: '/docs/frontend/vue3-core/docs/runtime-core.md',
+        },
+      ],
+      '/docs/frontend/js': [
+        {
+          text: '事件循环',
+          link: '/docs/frontend/js/event-loop/index.md',
+        },
+        {
+          text: 'Promise',
+          link: '/docs/frontend/js/promise/index.md',
         },
       ],
     },
