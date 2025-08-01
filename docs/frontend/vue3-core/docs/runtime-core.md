@@ -2004,3 +2004,72 @@ setTimeout(() => {
 ![20250720163822](https://tuchuang.coder-sunshine.top/images/20250720163822.png)
 
 ![20250720163834](https://tuchuang.coder-sunshine.top/images/20250720163834.png)
+
+### createApp
+
+```js
+import { h, createApp } from '../../../node_modules/vue/dist/vue.esm-browser.js'
+
+const Comp = {
+  render() {
+    return h('div', null, 'hello world')
+  },
+}
+
+const app = createApp(Comp)
+
+app.mount('#app')
+```
+
+![20250725154505](https://tuchuang.coder-sunshine.top/images/20250725154505.png)
+
+`createApp` API 的核心功能，这是 `Vue` 应用初始化的关键入口，其实 `createApp` 也没那么复杂，它的主要作用，就是将一个组件，挂载到一个 DOM 节点上，这让我们很容易想到之前我们一直在用的 `render` `函数，render` 函数的主要作用就是将一个 **虚拟节点** 渲染到某一个容器中。那么如果这样，我们是不是直接将这个组件转换成一个虚拟节点，然后调用 `render` 函数就可以了呢？答案是肯定的，实际上 `createApp` 的实现就是这样做的。
+
+#### 核心实现
+
+```ts
+// runtime-core/src/renderer.ts
+
+function createRenderer(options) {
+  // 省略部分代码...
+  const render = (vnode, container) => {
+    /**
+     * 省略逻辑代码...
+     */
+  }
+
+  return {
+    render,
+    // 💡 在这里，返回一个 createApp 函数，把 render 传进去
+    createApp: createAppAPI(render),
+  }
+}
+```
+
+实现 createAppAPI 函数
+
+```ts
+// runtime-core/src/apiCreateApp.ts
+
+import { h } from './h'
+
+export function createAppAPI(render) {
+  return function createApp(rootComponent, rootProps) {
+    const app = {
+      mount(container) {
+        /**
+         * 根组件
+         * 要挂载的容器
+         */
+
+        // 创建组件的虚拟节点
+        const vnode = h(rootComponent, rootProps)
+
+        // 将组件的虚拟节点挂载到 container 中
+        render(vnode, container)
+      },
+    }
+    return app
+  }
+}
+```

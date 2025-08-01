@@ -11,6 +11,9 @@ hero:
     alt: 背景图
   actions:
     - theme: brand
+      text: javaScript
+      link: /docs/frontend/js/event-loop
+    - theme: brand
       text: Vue3源码解析
       link: /docs/frontend/vue3-core/docs
     - theme: brand

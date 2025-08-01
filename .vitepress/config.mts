@@ -94,6 +94,10 @@ export default defineConfig({
           text: 'Promise',
           link: '/docs/frontend/js/promise/index.md',
         },
+        {
+          text: '常见手写题',
+          link: '/docs/frontend/js/common-write/index.md',
+        },
       ],
     },
 

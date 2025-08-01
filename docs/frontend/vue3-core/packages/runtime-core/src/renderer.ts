@@ -1,5 +1,6 @@
 import { ShapeFlags } from '@vue/shared'
 import { isSameVNodeType, normalizeVNode, Text } from './vnode'
+import { createAppAPI } from './apiCreateApp'
 
 export function createRenderer(options) {
   // 拿到 nodeOps 里面的操作 Dom 方法
@@ -438,6 +439,7 @@ export function createRenderer(options) {
 
   return {
     render,
+    createApp: createAppAPI(render),
   }
 }
 
