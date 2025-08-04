@@ -1,3 +1,9 @@
+/**
+ *
+ * @param fn 传入的异步函数
+ * @param delay 延迟执行的时间
+ * @returns 延迟执行的异步函数
+ */
 function delayAsync(fn, delay) {
   return function (...args) {
     return new Promise((resolve, reject) => {

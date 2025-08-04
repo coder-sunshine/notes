@@ -277,11 +277,89 @@ function createCancelTask(asyncTask) {
 
 这样的话就只有第二次的请求结果了，也就解决了请求竞态的问题。 **也就是修改了运行时的函数体**
 
+### 分时函数的封装
+
+当有长任务要执行的时候，导致渲染帧被迫延后了，就没办法进行渲染了，所以看上去会有卡顿现象。
+
+举例：
+
+点击按钮的时候，创建 100000 个 div，
+
+```js
+const tasks = Array.from({ length: 100000 }, (_, i) => () => {
+  const div = document.createElement('div')
+  div.textContent = i
+  document.body.appendChild(div)
+})
+
+btn2.onclick = () => {
+  console.log('开始执行任务')
+  for (const task of tasks) {
+    task()
+  }
+}
+```
+
+解决：
+不能一次性将任务全部执行完，而是应该分步去执行。
+
+渲染帧，每一帧有很多事情做，可能是渲染，执行js，处理事件回调，总之有很多事情要做，做完这些事情过后呢，可能还剩余一部分时间，这一帧16.6ms还没到，这部分时间就是空闲时间，在这一段时间去做处理，不会影响到渲染，别占用太久就行，把这个空闲时间用完，空闲时间可以通过 `requestIdleCallback` 回调函数来获取。
+当有空余时间的时候，就会执行这个回调
+
+封装一个 函数 performTask
+
+```js
+const tasks = Array.from({ length: 100000 }, (_, i) => () => {
+  const div = document.createElement('div')
+  div.textContent = i
+  document.body.appendChild(div)
+})
+
+btn.onclick = () => {
+  performTask(tasks)
+}
+
+// 分步执行任务
+function performTask(tasks) {
+  // 渲染帧空闲时间回调
+  requestIdleCallback(() => {
+    while (当前还有任务要执行 && 这一帧还有空闲时间可用) {
+      执行一个任务
+    }
+  })
+}
+```
+
+这样的话一步的执行量就完成了,还得启动下一步的执行。
+
+```js
+// 分步执行任务
+function performTask(tasks) {
+  // 渲染帧空闲时间回调
+  const _run = () => {
+    requestIdleCallback(() => {
+      while (当前还有任务要执行 && 这一帧还有空闲时间可用) {
+        执行一个任务
+      }
+      // 当 while 循环结束后，说明当前帧没有空闲时间了，或者任务已经执行完了
+      if (当前还有任务要执行) {
+        // 继续注册下一步任务事件，重复的调用 _run
+        _run()
+      }
+    })
+  }
+
+  _run()
+}
+```
+
+这样的话程序的整体结构就写出来了
+
 ### 异步相关问题
 
 #### 异步函数延迟执行工具
 
-有的时候需要将异步函数延迟执行，但是又不能修改原函数的代码，这个时候就可以使用这个工具函数了，实现也很简单，只需要返回一个 promise,然后将原函数的状态通过 promise 穿透就行了。
+有的时候需要将异步函数延迟执行，但是又不能修改原函数的代码，这个时候就可以使用这个工具函数了，实现也很简单，只需要返回一个 `promise`,然后将原函数的状态通过 `promise` 穿透就行了。
 
 ```js
 function delayAsync(fn, delay) {
