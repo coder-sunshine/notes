@@ -276,3 +276,46 @@ function createCancelTask(asyncTask) {
 ![20250801161402](https://tuchuang.coder-sunshine.top/images/20250801161402.png)
 
 这样的话就只有第二次的请求结果了，也就解决了请求竞态的问题。 **也就是修改了运行时的函数体**
+
+### 异步相关问题
+
+#### 异步函数延迟执行工具
+
+有的时候需要将异步函数延迟执行，但是又不能修改原函数的代码，这个时候就可以使用这个工具函数了，实现也很简单，只需要返回一个 promise,然后将原函数的状态通过 promise 穿透就行了。
+
+```js
+function delayAsync(fn, delay) {
+  return function (...args) {
+    return new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        try {
+          const result = await fn.apply(this, args)
+          resolve(result)
+        } catch (error) {
+          reject(error)
+        }
+      }, delay)
+    })
+  }
+}
+```
+
+使用示例：
+
+```js
+// 使用示例
+const asyncFn = async name => {
+  return `Hello, ${name}!`
+  // return Promise.reject('error')
+}
+
+const delayedAsyncFn = delayAsync(asyncFn, 2000)
+
+delayedAsyncFn('World')
+  .then(result => {
+    console.log(result) // 2秒后输出: Hello, World!
+  })
+  .catch(error => {
+    console.log('error', error)
+  })
+```
