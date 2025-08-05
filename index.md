@@ -12,7 +12,7 @@ hero:
   actions:
     - theme: brand
       text: javaScript
-      link: /docs/frontend/js/event-loop
+      link: /docs/frontend/js/base/arrow-function
     - theme: brand
       text: Vue3源码解析
       link: /docs/frontend/vue3-core/docs
@@ -22,6 +22,9 @@ hero:
     - theme: brand
       text: 前端工程化
       link: /docs/frontend/engineering/rollup/quick-start
+    - theme: brand
+      text: 面试记录
+      link: /docs/interview/shentong-2
 
 features:
   - title: 💡 小建议

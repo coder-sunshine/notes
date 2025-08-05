@@ -87,6 +87,12 @@ export default defineConfig({
       ],
       '/docs/frontend/js': [
         {
+          text: 'js基础',
+          items: [
+            { text: '箭头函数', link: '/docs/frontend/js/base/arrow-function.md' },
+          ],
+        },
+        {
           text: '事件循环',
           link: '/docs/frontend/js/event-loop/index.md',
         },
