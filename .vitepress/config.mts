@@ -105,6 +105,14 @@ export default defineConfig({
           link: '/docs/frontend/js/common-write/index.md',
         },
       ],
+      '/docs/interview': [
+        {
+          text: '面试记录',
+          items: [
+            { text: '2025.08.05 申通二面', link: '/docs/interview/shentong-2.md' },
+          ],
+        },
+      ],
     },
 
     // 页脚
