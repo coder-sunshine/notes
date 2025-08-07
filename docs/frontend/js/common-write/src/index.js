@@ -57,3 +57,34 @@ const addCurry = curry(add)
 console.log(addCurry(1, 2, 3))
 console.log(addCurry(1, 2)(3))
 console.log(addCurry(1)(2)(3))
+
+function method(name) {
+  console.log(name)
+  console.log('this==>', this)
+}
+
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+
+  // 拿到函数 fn，这里的 this 就是 fn，因为是 fn.myCall
+  const fn = this
+
+  const fnKey = Symbol('fnKey')
+
+  Object.defineProperty(context, fnKey, {
+    value: fn,
+    // 不可枚举，防止被遍历到
+    enumerable: false,
+  })
+
+  // 在使用传入的 this 也就是 context 调用 fn
+  const res = context[fnKey](...args)
+
+  // 拿到结果后，就可以把临时的符号属性删除
+  delete context[fnKey]
+
+  return res
+}
+
+method.myCall({}, '张三')

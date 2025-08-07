@@ -99,6 +99,118 @@ console.log(addCurry(1)(2)(3))
 
 ![20250801142000](https://tuchuang.coder-sunshine.top/images/20250801142000.png)
 
+### call
+
+手写 `call` 的时候有几点注意事项
+
+- 首先肯定是在函数原型上去写，这样才能让所有函数使用
+- `this` 的话传 `null` 和 `undefined` 会指向全局，传原始值就会返回对应的包装类
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+}
+```
+
+然后解决调用的问题
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+}
+
+function method(name) {
+  console.log(name)
+  console.log('this==>', this)
+}
+
+method.myCall({ age: 18 }, '张三')
+```
+
+外界是直接 `method.myCall` 调用，所以`myCall` 里面的 `this` 就是 `method`
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+
+  // 拿到函数 fn，这里的 this 就是 fn，因为是 fn.myCall
+  const fn = this // [!code ++]
+}
+```
+
+拿到 `fn` 后在使用传入 的 `context` 调用 `Fn` 就行了
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+
+  // 拿到函数 fn，这里的 this 就是 fn，因为是 fn.myCall
+  const fn = this
+
+  // 在使用传入的 this 也就是 context 调用 fn
+  const res = context.fn(...args) // [!code ++]
+  return res // [!code ++]
+}
+```
+
+![20250807204921](https://tuchuang.coder-sunshine.top/images/20250807204921.png)
+
+这样运行肯定是报错的。因为此时 context 上面根本就没有 fn，所以需要把 fn 挂载到 context 上，
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+
+  // 拿到函数 fn，这里的 this 就是 fn，因为是 fn.myCall
+  const fn = this
+
+  context.fn = fn // [!code ++]
+
+  // 在使用传入的 this 也就是 context 调用 fn
+  const res = context.fn(...args)
+  return res
+}
+
+method.myCall({}, '张三')
+```
+
+![20250807205241](https://tuchuang.coder-sunshine.top/images/20250807205241.png)
+
+这样做的话虽然调用成功了，但是是有一些隐患的，因为 `this` 上面明明穿的是空 `{}`，却打印出来了 `fn`，所以我们应该使用 `Object.defineProperty` 加 `Symbol` 来定义 `fn`，最后拿到函数调用的值后删掉这个符号属性
+
+```js
+Function.prototype.myCall = function (context, ...args) {
+  // 给 this 指向重新赋值
+  context = context == null ? globalThis : Object(context)
+
+  // 拿到函数 fn，这里的 this 就是 fn，因为是 fn.myCall
+  const fn = this
+
+  const fnKey = Symbol('fnKey')
+
+  Object.defineProperty(context, fnKey, {
+    value: fn,
+    // 不可枚举，防止被遍历到
+    enumerable: false,
+  })
+
+  // 在使用传入的 this 也就是 context 调用 fn
+  const res = context[fnKey](...args)
+
+  // 拿到结果后，就可以把临时的符号属性删除
+  delete context[fnKey]
+
+  return res
+}
+```
+
+这样就完整实现了
+
 ## 场景
 
 ### 请求竞态问题
