@@ -301,12 +301,12 @@ btn2.onclick = () => {
 ```
 
 解决：
-不能一次性将任务全部执行完，而是应该分步去执行。
+**不能一次性将任务全部执行完，而是应该分步去执行。**
 
 渲染帧，每一帧有很多事情做，可能是渲染，执行js，处理事件回调，总之有很多事情要做，做完这些事情过后呢，可能还剩余一部分时间，这一帧16.6ms还没到，这部分时间就是空闲时间，在这一段时间去做处理，不会影响到渲染，别占用太久就行，把这个空闲时间用完，空闲时间可以通过 `requestIdleCallback` 回调函数来获取。
 当有空余时间的时候，就会执行这个回调
 
-封装一个 函数 performTask
+封装一个 函数 `performTask`
 
 ```js
 const tasks = Array.from({ length: 100000 }, (_, i) => () => {
@@ -353,7 +353,93 @@ function performTask(tasks) {
 }
 ```
 
-这样的话程序的整体结构就写出来了
+这样的话程序的整体结构就写出来了,然后实现代码就行了
+
+```js
+function performTask(tasks) {
+  // 记录当前执行任务的下标
+  let index = 0
+  // 渲染帧空闲时间回调
+  const _run = () => {
+    requestIdleCallback(idle => {
+      while (index < tasks.length && idle.timeRemaining() > 0) {
+        tasks[index++]()
+      }
+      // 当 while 循环结束后，说明当前帧没有空闲时间了，或者任务已经执行完了
+      if (index < tasks.length) {
+        // 继续注册下一步任务事件，重复的调用 _run
+        _run()
+      }
+    })
+  }
+
+  _run()
+}
+```
+
+这样就完成了在 `requestIdleCallback` 回调函数中去处理这些小任务的处理。接下来可以把这个场景封装成一个通用的场景，比如可以让用户自己决定调用的次数，什么时候调用，调用什么分片任务。
+
+```js
+/**
+ *
+ * @param {Number} executorNum 执行任务的次数
+ * @param {Function} taskHandler 执行什么任务
+ * @param {Function | undefined} scheduler 调度器，默认为 requestIdleCallback
+ */
+function performTask(executorNum, taskHandler, scheduler) {
+  if (scheduler === undefined) {
+    // 默认的调度器
+    scheduler = isGoOn => {
+      requestIdleCallback(idle => {
+        isGoOn(() => idle.timeRemaining() > 0)
+      })
+    }
+  }
+
+  // 记录当前执行任务的下标
+  let index = 0
+  // 渲染帧空闲时间回调
+  const _run = () => {
+    scheduler(isGoOn => {
+      while (index < executorNum && isGoOn()) {
+        // 满足条件，执行任务
+        taskHandler(index++)
+      }
+      // 当 while 循环结束后，说明当前帧没有空闲时间了，或者任务已经执行完了
+      if (index < executorNum) {
+        // 继续注册下一步任务事件，重复的调用 _run
+        _run()
+      }
+    })
+  }
+
+  _run()
+}
+```
+
+这样就可以这样调用了
+
+```js
+btn.onclick = () => {
+  console.log('开始执行任务')
+
+  const scheduler = isGoOn => {
+    let count = 0
+    setTimeout(() => {
+      isGoOn(() => count++ < 3)
+    }, 1000)
+  }
+
+  const taskHandler = index => {
+    const div = document.createElement('div')
+    div.textContent = index
+    document.body.appendChild(div)
+  }
+
+  // 不传就是 requestIdleCallback
+  performTask(100000, taskHandler)
+}
+```
 
 ### 异步相关问题
 
