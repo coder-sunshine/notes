@@ -26,7 +26,7 @@ promise用catch，async/await用try/catch
 
 没答出来
 
-### 7. 如果有很多接口请求，不入侵代码的情况下，怎样捕获到错误（我回答了axios拦截器，讲不依赖第三方库）
+### 7. 如果有很多接口请求，不入侵代码的情况下，怎样捕获到错误（原问题好像是问怎样全局拦截promise错误）（我回答了axios拦截器，讲不依赖第三方库）
 
 没答出来
 
@@ -107,7 +107,73 @@ dom,还有解决闭包陷阱等
 - vue中可以用 [errorHandle](https://cn.vuejs.org/api/application.html#app-config-errorhandler)
 - js 中可以用 `window.onerror = function(message, source, line, column, error) {}`
 
-### 7.如果有很多接口请求，不入侵代码的情况下，怎样捕获到错误，不依赖第三方库
+### 7.如果有很多接口请求，不入侵代码的情况下，怎样捕获到错误，不依赖第三方库，原问题好像就是问怎样全局拦截promise错误
+
+大致有以下两种方法，
+
+- 拦截`promise`错误，
+
+```js
+window.addEventListener('unhandledrejection', function (event) {
+  // event.promise 是产生错误的Promise
+  // event.reason 是Promise被reject的原因（错误对象）
+  console.error('Unhandled promise rejection:', event.reason)
+  // 可以在这里进行错误上报或其他处理
+  // 阻止默认处理（比如控制台打印）
+  event.preventDefault()
+})
+```
+
+- 重写 `fetch`
+
+```javascript
+// 保存原生的fetch
+const originalFetch = window.fetch
+// 重写fetch
+window.fetch = function (...args) {
+  // 调用原始的fetch，返回一个promise
+  return originalFetch.apply(this, args).catch(error => {
+    // 捕获请求错误
+    console.error('Fetch request failed:', error)
+    // 这里可以进行错误上报
+    // 可以选择将错误继续抛出，以便于后续代码捕获
+    throw error
+  })
+}
+```
+
+- 重写 xmlhttprequest
+
+```javascript
+const originalXHROpen = XMLHttpRequest.prototype.open
+const originalXHRSend = XMLHttpRequest.prototype.send
+// 重写open方法
+XMLHttpRequest.prototype.open = function (method, url) {
+  // 保存请求的信息，以便在错误时使用
+  this._requestMethod = method
+  this._requestURL = url
+  originalXHROpen.apply(this, arguments)
+}
+// 重写send方法
+XMLHttpRequest.prototype.send = function (body) {
+  // 监听错误事件
+  this.addEventListener('error', function () {
+    console.error(`XMLHttpRequest request failed for ${this._requestMethod} ${this._requestURL}`)
+    // 错误上报
+  })
+  // 监听状态改变
+  this.addEventListener('loadend', function () {
+    // 状态码4xx, 5xx等也可以视为错误
+    if (this.status >= 400) {
+      console.error(`XMLHttpRequest request returned with status ${this.status} for ${this._requestMethod} ${this._requestURL}`)
+      // 错误上报
+    }
+  })
+  originalXHRSend.apply(this, arguments)
+}
+```
+
+注意：**重写原生方法可能会引起与其他库的冲突，因此需要谨慎。确保在应用初始化之前就重写这些方法，并且不要破坏原有的功能。**，最好是使用第一种方案
 
 ### 8.如果有很多节点，怎么在不操作dom的情况下，点击哪个地方，就能获得点击的地方的文本
 
